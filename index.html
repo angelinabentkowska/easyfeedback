@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EasyFeedback — Zbieraj feedback, który zmienia</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='8' fill='url(%23g)'/%3E%3Cpath d='M8 14h12M14 8v12' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='28' y2='28' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%237c5cfc'/%3E%3Cstop offset='1' stop-color='%232dd4a0'/%3E%3C/linearGradient%3E%3C/defs%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -242,6 +243,16 @@
     .round-meta { font-size: 13px; color: var(--text2); }
     .round-meta span { color: var(--text3); }
     .round-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .round-delete {
+      position: absolute; top: 12px; right: 12px;
+      width: 24px; height: 24px; border-radius: 50%;
+      background: transparent; border: none;
+      color: var(--text3); cursor: pointer; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; opacity: 0;
+    }
+    .round-card:hover .round-delete { opacity: 1; }
+    .round-delete:hover { background: var(--red-bg); color: var(--red); }
     .round-responses { font-size: 13px; color: var(--text2); }
     .round-responses strong { color: var(--text); font-weight: 600; }
 
@@ -984,6 +995,7 @@ function renderRoundCard(round, responseCount = 0) {
   const date = new Date(round.created_at).toLocaleDateString('pl-PL', {day:'numeric',month:'long',year:'numeric'});
   return `
     <div class="round-card" onclick="showRoundDetail('${round.id}')">
+      <button class="round-delete" onclick="event.stopPropagation();confirmDeleteRound('${round.id}','${round.name.replace(/'/g,"\\'")}')">×</button>
       <div class="round-status ${isOpen ? 'open' : 'closed'}">${isOpen ? 'Aktywna' : 'Zamknięta'}</div>
       <div class="round-title">${round.name}</div>
       <div class="round-meta">Utworzona <span>${date}</span></div>
@@ -993,6 +1005,19 @@ function renderRoundCard(round, responseCount = 0) {
         <div class="badge badge-purple">${round.questions?.length || 0} pytań</div>
       </div>
     </div>`;
+}
+
+function confirmDeleteRound(roundId, roundName) {
+  if (confirm(`Czy na pewno chcesz usunąć "${roundName}"?\n\nTa operacja usunie również wszystkie zebrane odpowiedzi. Nie można jej cofnąć.`)) {
+    deleteRound(roundId);
+  }
+}
+
+async function deleteRound(roundId) {
+  const { error } = await sb.from('rounds').delete().eq('id', roundId);
+  if (error) { showToast('Błąd usuwania rundy', 'error'); return; }
+  showToast('Runda usunięta', 'success');
+  await loadRounds();
 }
 
 async function createRound() {
