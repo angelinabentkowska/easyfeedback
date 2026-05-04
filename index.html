@@ -658,11 +658,12 @@
               <h3>Podstawowe informacje</h3>
               <div style="margin-bottom:16px">
                 <label class="form-label">Nazwa rundy</label>
-                <input class="form-input" id="round-name" placeholder="np. Feedback Q2 2025, Ocena roczna...">
+                <input class="form-input" id="round-name" placeholder="np. feedback styczniowy; feedback po Q2; pytam, bo muszę...">
               </div>
               <div>
                 <label class="form-label">Deadline (opcjonalnie)</label>
-                <input class="form-input" type="date" id="round-deadline">
+                <input class="form-input" type="date" id="round-deadline" min="">
+                <script>document.getElementById('round-deadline').min = new Date().toISOString().split('T')[0];</script>
               </div>
             </div>
 
@@ -800,7 +801,15 @@
       </div>
       <div>
         <label class="form-label">Kategoria</label>
-        <input class="form-input" id="cq-category" placeholder="np. Performance, Kultura...">
+        <select class="form-select" id="cq-category">
+          <option value="Performance">Performance</option>
+          <option value="Seniority i samodzielność">Seniority i samodzielność</option>
+          <option value="Zaangażowanie i inicjatywa">Zaangażowanie i inicjatywa</option>
+          <option value="Kultura i postawa">Kultura i postawa</option>
+          <option value="Ja w roli">Ja w roli</option>
+          <option value="Pytanie otwarte">Pytanie otwarte</option>
+          <option value="Inne">Inne</option>
+        </select>
       </div>
       <div>
         <label class="form-label">Typ pytania</label>
@@ -1480,7 +1489,7 @@ function openCustomQuestionModal() {
 
 function addCustomQuestion() {
   const text = document.getElementById('cq-text').value.trim();
-  const category = document.getElementById('cq-category').value.trim() || 'Inne';
+  const category = document.getElementById('cq-category').value || 'Inne';
   const type = document.getElementById('cq-type').value;
   if (!text) { showToast('Wpisz treść pytania', 'error'); return; }
 
@@ -1608,27 +1617,32 @@ async function renderFeedbackFormStep(round, step) {
         <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
       </div>
       ${round.allow_anonymous ? `
-      <div class="anon-toggle" onclick="fbAnon=!fbAnon;this.querySelector('.toggle').classList.toggle('on')" style="margin-bottom:24px">
-        <div class="toggle on"></div>
+      <div class="anon-toggle" id="anon-toggle-btn" style="margin-bottom:16px">
+        <div class="toggle on" id="anon-toggle-switch"></div>
         <div class="anon-text">
-          <h4>Odpowiedz anonimowo</h4>
+          <h4 id="anon-toggle-label">Chcę udzielić feedbacku anonimowo</h4>
           <p>Twoje imię nie będzie widoczne dla odbiorcy</p>
         </div>
       </div>` : ''}
-      <div id="name-field" style="margin-bottom:24px;display:${round.allow_anonymous ? 'none' : 'block'}">
+      <div id="name-field" style="margin-bottom:24px;display:none">
         <label class="form-label">Twoje imię i nazwisko</label>
         <input class="form-input" id="fb-name" placeholder="np. Jan Kowalski">
       </div>
       <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
 
-    // Toggle anon field visibility
+    // Toggle anon - default ON (anonymous), show name when toggled OFF
+    fbAnon = true;
     if (round.allow_anonymous) {
-      const anonToggle = card.querySelector('.anon-toggle');
+      const toggleBtn = card.querySelector('#anon-toggle-btn');
+      const toggleSwitch = card.querySelector('#anon-toggle-switch');
       const nameField = card.querySelector('#name-field');
-      if (anonToggle) {
-        anonToggle.addEventListener('click', () => {
-          fbAnon = !anonToggle.querySelector('.toggle').classList.contains('on');
+      const label = card.querySelector('#anon-toggle-label');
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          fbAnon = !fbAnon;
+          toggleSwitch.classList.toggle('on', fbAnon);
           nameField.style.display = fbAnon ? 'none' : 'block';
+          label.textContent = fbAnon ? 'Chcę udzielić feedbacku anonimowo' : 'Podpisz swój feedback';
         });
       }
     }
@@ -1641,7 +1655,7 @@ async function renderFeedbackFormStep(round, step) {
       <div style="text-align:center;padding:20px 0">
         <div style="font-size:56px;margin-bottom:20px">🙌</div>
         <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
-        <p style="color:var(--text2);font-size:15px">Twój feedback został zapisany. Pomożesz tej osobie się rozwijać.</p>
+        <p style="color:var(--text2);font-size:15px">Właśnie dołożyłeś swoją cegiełkę w czyjś rozwój!</p>
       </div>`;
 
     // Save to Supabase
@@ -1693,7 +1707,6 @@ async function renderFeedbackFormStep(round, step) {
 }
 
 function startFeedback() {
-  fbAnon = document.querySelector('.anon-toggle .toggle')?.classList.contains('on') ?? true;
   fbName = document.getElementById('fb-name')?.value || '';
   renderFeedbackFormStep(fbRound, 1);
 }
