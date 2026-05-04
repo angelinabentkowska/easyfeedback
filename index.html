@@ -946,15 +946,20 @@ async function handleLogout() {
 }
 
 // ═══════════════════════════════════════════
-// ROUNDS
+// ROUNDS — SUPABASE
 // ═══════════════════════════════════════════
 async function loadRounds() {
   const container = document.getElementById('rounds-container');
+  container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  // Load from localStorage (no DB tables needed yet)
-  const rounds = getRounds();
+  const { data: rounds, error } = await sb
+    .from('rounds')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  if (rounds.length === 0) {
+  if (error) { showToast('Błąd ładowania rund', 'error'); return; }
+
+  if (!rounds || rounds.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">📬</div>
@@ -965,22 +970,14 @@ async function loadRounds() {
     return;
   }
 
-  container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r)).join('')}</div>`;
+  const { data: respData } = await sb.from('responses').select('round_id');
+  const countMap = {};
+  (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
+
+  container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
 }
 
-function getRounds() {
-  if (!currentUser) return [];
-  const key = `ef_rounds_${currentUser.id}`;
-  return JSON.parse(localStorage.getItem(key) || '[]');
-}
-
-function saveRounds(rounds) {
-  const key = `ef_rounds_${currentUser.id}`;
-  localStorage.setItem(key, JSON.stringify(rounds));
-}
-
-function renderRoundCard(round) {
-  const responses = getResponses(round.id);
+function renderRoundCard(round, responseCount = 0) {
   const isOpen = round.status === 'open';
   const date = new Date(round.created_at).toLocaleDateString('pl-PL', {day:'numeric',month:'long',year:'numeric'});
   return `
@@ -990,7 +987,7 @@ function renderRoundCard(round) {
       <div class="round-meta">Utworzona <span>${date}</span></div>
       ${round.deadline ? `<div class="round-meta">Deadline: <span>${new Date(round.deadline).toLocaleDateString('pl-PL')}</span></div>` : ''}
       <div class="round-footer">
-        <div class="round-responses">Odpowiedzi: <strong>${responses.length}</strong></div>
+        <div class="round-responses">Odpowiedzi: <strong>${responseCount}</strong></div>
         <div class="badge badge-purple">${round.questions?.length || 0} pytań</div>
       </div>
     </div>`;
@@ -1004,20 +1001,16 @@ async function createRound() {
   const deadline = document.getElementById('round-deadline').value;
   const allowAnon = document.getElementById('toggle-anon').classList.contains('on');
 
-  const round = {
-    id: 'round_' + Date.now(),
+  const { error: createError } = await sb.from('rounds').insert({
     name,
     deadline: deadline || null,
     allow_anonymous: allowAnon,
     status: 'open',
-    created_at: new Date().toISOString(),
     user_id: currentUser.id,
     questions: selectedQuestions.map(q => ({...q}))
-  };
+  });
 
-  const rounds = getRounds();
-  rounds.unshift(round);
-  saveRounds(rounds);
+  if (createError) { showToast('Błąd tworzenia rundy: ' + createError.message, 'error'); return; }
 
   showToast('Runda utworzona! 🎉', 'success');
   selectedQuestions = [];
@@ -1032,13 +1025,20 @@ async function createRound() {
 // ═══════════════════════════════════════════
 // ROUND DETAIL
 // ═══════════════════════════════════════════
-function showRoundDetail(roundId) {
+async function showRoundDetail(roundId) {
   currentRoundId = roundId;
-  const rounds = getRounds();
-  const round = rounds.find(r => r.id === roundId);
-  if (!round) return;
+  document.getElementById('detail-title').textContent = 'Ładowanie...';
+  document.getElementById('detail-subtitle').textContent = '';
+  document.getElementById('detail-actions').innerHTML = '';
+  document.getElementById('detail-content').innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
+  showView('detail');
 
-  const responses = getResponses(roundId);
+  const { data: round, error: rErr } = await sb.from('rounds').select('*').eq('id', roundId).single();
+  if (rErr || !round) { showToast('Nie znaleziono rundy', 'error'); return; }
+
+  const { data: respData } = await sb.from('responses').select('*').eq('round_id', roundId);
+  const responses = respData || [];
+
   const isOpen = round.status === 'open';
   const feedbackUrl = `${window.location.origin}${window.location.pathname}?feedback=${roundId}`;
 
@@ -1079,7 +1079,7 @@ function showRoundDetail(roundId) {
         <div class="stat-label">Pytań</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${responses.filter(r=>r.anonymous).length}</div>
+        <div class="stat-value">${responses.filter(r=>r.anonymous===true).length}</div>
         <div class="stat-label">Anonimowych</div>
       </div>
     </div>`;
@@ -1164,15 +1164,11 @@ function showRoundDetail(roundId) {
   showView('detail');
 }
 
-function closeRound(roundId) {
-  const rounds = getRounds();
-  const idx = rounds.findIndex(r => r.id === roundId);
-  if (idx !== -1) {
-    rounds[idx].status = 'closed';
-    saveRounds(rounds);
-    showToast('Runda zamknięta', 'success');
-    showRoundDetail(roundId);
-  }
+async function closeRound(roundId) {
+  const { error } = await sb.from('rounds').update({ status: 'closed' }).eq('id', roundId);
+  if (error) { showToast('Błąd zamykania rundy', 'error'); return; }
+  showToast('Runda zamknięta', 'success');
+  await showRoundDetail(roundId);
 }
 
 function generateAISummary(round, responses) {
@@ -1341,30 +1337,18 @@ function deleteQuestion(qId) {
 // ═══════════════════════════════════════════
 // FEEDBACK FORM (public)
 // ═══════════════════════════════════════════
-function getRoundById(roundId) {
-  // Search all users' rounds (public form — we need to find the round somehow)
-  // For now we store in localStorage under the round id directly
-  const key = `ef_round_public_${roundId}`;
-  let round = JSON.parse(localStorage.getItem(key) || 'null');
-  if (!round) {
-    // Search all ef_rounds keys
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('ef_rounds_')) {
-        const rounds = JSON.parse(localStorage.getItem(k) || '[]');
-        const found = rounds.find(r => r.id === roundId);
-        if (found) { round = found; localStorage.setItem(key, JSON.stringify(found)); break; }
-      }
-    }
-  }
-  return round;
-}
+// getRoundById replaced by direct Supabase call in loadFeedbackForm
 
 async function loadFeedbackForm(roundId) {
   const card = document.getElementById('feedback-form-card');
-  const round = getRoundById(roundId);
 
-  if (!round) {
+  const { data: round, error } = await sb
+    .from('rounds')
+    .select('*')
+    .eq('id', roundId)
+    .single();
+
+  if (error || !round) {
     card.innerHTML = `
       <div style="text-align:center;padding:40px">
         <div style="font-size:48px;margin-bottom:16px">🔍</div>
@@ -1387,14 +1371,14 @@ async function loadFeedbackForm(roundId) {
   renderFeedbackFormStep(round, 0);
 }
 
-function getResponses(roundId) {
-  return JSON.parse(localStorage.getItem(`ef_responses_${roundId}`) || '[]');
-}
-
-function saveResponse(roundId, response) {
-  const responses = getResponses(roundId);
-  responses.push(response);
-  localStorage.setItem(`ef_responses_${roundId}`, JSON.stringify(responses));
+async function saveResponse(roundId, response) {
+  const { error } = await sb.from('responses').insert({
+    round_id: roundId,
+    anonymous: response.anonymous,
+    respondent_name: response.respondent_name,
+    answers: response.answers
+  });
+  if (error) console.error('Error saving response:', error);
 }
 
 let fbRound = null;
@@ -1455,16 +1439,12 @@ function renderFeedbackFormStep(round, step) {
         <p style="color:var(--text2);font-size:15px">Twój feedback został zapisany. Pomożesz tej osobie się rozwijać.</p>
       </div>`;
 
-    // Save
-    const response = {
-      id: 'resp_' + Date.now(),
-      round_id: round.id,
-      submitted_at: new Date().toISOString(),
+    // Save to Supabase
+    await saveResponse(round.id, {
       anonymous: fbAnon,
       respondent_name: fbAnon ? null : fbName,
       answers: fbAnswers
-    };
-    saveResponse(round.id, response);
+    });
     return;
   }
 
