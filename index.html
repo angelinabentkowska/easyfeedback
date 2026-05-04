@@ -1387,7 +1387,7 @@ let fbAnswers = {};
 let fbAnon = true;
 let fbName = '';
 
-function renderFeedbackFormStep(round, step) {
+async function renderFeedbackFormStep(round, step) {
   fbRound = round;
   fbCurrentQ = step;
   const card = document.getElementById('feedback-form-card');
