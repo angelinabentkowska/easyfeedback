@@ -1,0 +1,1585 @@
+<!DOCTYPE html>
+<html lang="pl" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyFeedback — Zbieraj feedback, który zmienia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #1a1a24;
+      --bg4: #22222f;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0f0f5;
+      --text2: #9999b0;
+      --text3: #5a5a70;
+      --accent: #7c5cfc;
+      --accent2: #a080ff;
+      --accent-glow: rgba(124,92,252,0.25);
+      --green: #2dd4a0;
+      --green-bg: rgba(45,212,160,0.1);
+      --red: #ff5566;
+      --red-bg: rgba(255,85,102,0.1);
+      --yellow: #f5c542;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+    [data-theme="light"] {
+      --bg: #f5f5fa;
+      --bg2: #ffffff;
+      --bg3: #ebebf5;
+      --bg4: #e0e0ee;
+      --border: rgba(0,0,0,0.08);
+      --border2: rgba(0,0,0,0.14);
+      --text: #0a0a1a;
+      --text2: #555570;
+      --text3: #999ab0;
+      --accent-glow: rgba(124,92,252,0.12);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { font-size: 15px; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+    h1,h2,h3,h4 { font-family: 'Syne', sans-serif; }
+
+    /* ─── PAGES ─── */
+    .page { display: none; min-height: 100vh; }
+    .page.active { display: flex; flex-direction: column; }
+
+    /* ─── AUTH PAGE ─── */
+    #page-auth {
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+    }
+    #page-auth::before {
+      content: '';
+      position: absolute;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(124,92,252,0.15) 0%, transparent 70%);
+      top: -200px; right: -200px;
+      pointer-events: none;
+    }
+    #page-auth::after {
+      content: '';
+      position: absolute;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(45,212,160,0.08) 0%, transparent 70%);
+      bottom: -100px; left: -100px;
+      pointer-events: none;
+    }
+    .auth-card {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 48px;
+      width: 420px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+    }
+    .auth-logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .auth-logo span { color: var(--accent2); }
+    .auth-tagline { color: var(--text2); font-size: 14px; margin-bottom: 36px; }
+    .auth-tabs { display: flex; gap: 0; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+    .auth-tab {
+      flex: 1; padding: 10px; text-align: center;
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+      color: var(--text3); cursor: pointer; border-bottom: 2px solid transparent;
+      margin-bottom: -1px; transition: all 0.2s; letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .auth-tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+    .auth-form { display: none; flex-direction: column; gap: 16px; }
+    .auth-form.active { display: flex; }
+    .field label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .field input {
+      width: 100%; padding: 12px 16px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 14px;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .btn {
+      padding: 12px 20px; border-radius: var(--radius-sm); border: none;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em;
+    }
+    .btn-primary {
+      background: var(--accent); color: #fff;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); box-shadow: 0 6px 24px var(--accent-glow); }
+    .btn-secondary { background: var(--bg3); color: var(--text2); border: 1px solid var(--border2); }
+    .btn-secondary:hover { background: var(--bg4); color: var(--text); }
+    .btn-ghost { background: transparent; color: var(--text2); padding: 8px 12px; }
+    .btn-ghost:hover { color: var(--text); background: var(--bg3); }
+    .btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,85,102,0.2); }
+    .btn-danger:hover { background: rgba(255,85,102,0.2); }
+    .btn-google {
+      background: var(--bg3); color: var(--text);
+      border: 1px solid var(--border2);
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .btn-google:hover { background: var(--bg4); }
+    .divider { display: flex; align-items: center; gap: 12px; color: var(--text3); font-size: 12px; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .auth-msg { font-size: 13px; padding: 10px 14px; border-radius: var(--radius-sm); display: none; }
+    .auth-msg.error { background: var(--red-bg); color: var(--red); display: block; }
+    .auth-msg.success { background: var(--green-bg); color: var(--green); display: block; }
+
+    /* ─── APP LAYOUT ─── */
+    #page-app { flex-direction: row; }
+    .sidebar {
+      width: 240px; min-height: 100vh;
+      background: var(--bg2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 24px 0; flex-shrink: 0;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .sidebar-logo {
+      font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800;
+      padding: 0 20px 24px; border-bottom: 1px solid var(--border);
+      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+    }
+    .sidebar-logo span { color: var(--accent2); }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; cursor: pointer; transition: all 0.15s;
+      font-size: 14px; font-weight: 500; color: var(--text2);
+      border-left: 3px solid transparent; margin: 1px 0;
+    }
+    .nav-item:hover { background: var(--bg3); color: var(--text); }
+    .nav-item.active { background: var(--bg3); color: var(--accent2); border-left-color: var(--accent2); }
+    .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .sidebar-bottom { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+    .user-pill {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: var(--radius-sm);
+      background: var(--bg3); cursor: pointer;
+    }
+    .user-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--accent); display: flex; align-items: center; justify-content: center;
+      font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .user-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .theme-toggle {
+      display: flex; align-items: center; gap: 8px; margin-top: 10px;
+      padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer;
+      color: var(--text2); font-size: 13px;
+    }
+    .theme-toggle:hover { background: var(--bg3); color: var(--text); }
+
+    /* ─── MAIN CONTENT ─── */
+    .main { flex: 1; overflow-y: auto; }
+    .main-header {
+      padding: 28px 32px 0;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .main-title { font-size: 24px; font-weight: 800; }
+    .main-subtitle { color: var(--text2); font-size: 14px; margin-top: 4px; }
+    .content-area { padding: 0 32px 40px; }
+
+    /* ─── VIEWS ─── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ─── CARDS ─── */
+    .card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .card + .card { margin-top: 16px; }
+
+    /* ─── FEEDBACK ROUNDS LIST ─── */
+    .rounds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .round-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px; cursor: pointer;
+      transition: all 0.2s; position: relative; overflow: hidden;
+    }
+    .round-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    .round-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--green));
+    }
+    .round-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 4px 10px; border-radius: 20px; margin-bottom: 14px;
+    }
+    .round-status.open { background: var(--green-bg); color: var(--green); }
+    .round-status.closed { background: var(--bg3); color: var(--text3); }
+    .round-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .round-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+    .round-meta { font-size: 13px; color: var(--text2); }
+    .round-meta span { color: var(--text3); }
+    .round-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .round-responses { font-size: 13px; color: var(--text2); }
+    .round-responses strong { color: var(--text); font-weight: 600; }
+
+    /* ─── NEW ROUND FORM ─── */
+    .form-section { margin-bottom: 28px; }
+    .form-section h3 { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+    .form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .form-input, .form-textarea, .form-select {
+      width: 100%; padding: 11px 14px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 14px;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-select { cursor: pointer; }
+    .form-input:focus, .form-textarea:focus, .form-select:focus {
+      border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* ─── QUESTION BANK ─── */
+    .question-bank { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .qbank-category { padding: 10px 14px; background: var(--bg3); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); border-bottom: 1px solid var(--border); }
+    .qbank-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background 0.15s;
+    }
+    .qbank-item:last-child { border-bottom: none; }
+    .qbank-item:hover { background: var(--bg3); }
+    .qbank-item.selected { background: rgba(124,92,252,0.08); }
+    .qbank-checkbox {
+      width: 18px; height: 18px; border: 2px solid var(--border2);
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.15s;
+    }
+    .qbank-item.selected .qbank-checkbox { background: var(--accent); border-color: var(--accent); }
+    .qbank-item.selected .qbank-checkbox::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 700; }
+    .qbank-text { font-size: 14px; flex: 1; }
+    .qbank-type { font-size: 11px; color: var(--text3); background: var(--bg4); padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
+
+    /* ─── SELECTED QUESTIONS ─── */
+    .selected-questions { display: flex; flex-direction: column; gap: 10px; }
+    .sq-item {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 14px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .sq-drag { color: var(--text3); cursor: grab; padding-top: 2px; }
+    .sq-content { flex: 1; }
+    .sq-text { font-size: 14px; margin-bottom: 6px; }
+    .sq-type { font-size: 11px; color: var(--text3); background: var(--bg4); padding: 2px 8px; border-radius: 4px; display: inline-block; }
+    .sq-remove { color: var(--text3); cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.15s; }
+    .sq-remove:hover { color: var(--red); background: var(--red-bg); }
+
+    /* ─── TOGGLE SWITCH ─── */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-info h4 { font-size: 14px; font-weight: 500; }
+    .toggle-info p { font-size: 13px; color: var(--text2); margin-top: 2px; }
+    .toggle {
+      width: 44px; height: 24px; background: var(--bg4); border-radius: 12px;
+      cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
+    }
+    .toggle.on { background: var(--accent); }
+    .toggle::after {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      background: #fff; border-radius: 50%; top: 3px; left: 3px;
+      transition: transform 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    .toggle.on::after { transform: translateX(20px); }
+
+    /* ─── COPY LINK BOX ─── */
+    .copy-box {
+      display: flex; gap: 10px; align-items: center;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+    }
+    .copy-url { flex: 1; font-size: 13px; color: var(--text2); font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .copy-btn { flex-shrink: 0; }
+
+    /* ─── RESULTS / DASHBOARD ─── */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px;
+    }
+    .stat-value { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--accent2); }
+    .stat-label { font-size: 13px; color: var(--text2); margin-top: 4px; }
+    .question-result { margin-bottom: 28px; }
+    .qr-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .qr-text { font-size: 15px; font-weight: 600; }
+    .qr-avg { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--accent2); }
+    .scale-bar { display: flex; gap: 6px; margin-bottom: 8px; }
+    .scale-segment {
+      flex: 1; height: 8px; border-radius: 4px; background: var(--bg4);
+      transition: background 0.3s;
+    }
+    .scale-segment.filled { background: var(--accent); }
+    .scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); }
+    .open-responses { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .open-response {
+      background: var(--bg3); border-left: 3px solid var(--accent);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 12px 14px; font-size: 14px; color: var(--text);
+    }
+    .open-response-meta { font-size: 12px; color: var(--text3); margin-top: 6px; }
+
+    /* ─── AI SUMMARY ─── */
+    .ai-summary {
+      background: linear-gradient(135deg, rgba(124,92,252,0.1), rgba(45,212,160,0.05));
+      border: 1px solid rgba(124,92,252,0.3); border-radius: var(--radius);
+      padding: 24px; margin-bottom: 24px;
+    }
+    .ai-summary-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .ai-badge {
+      background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      padding: 4px 10px; border-radius: 20px;
+    }
+    .ai-summary-text { font-size: 15px; line-height: 1.7; color: var(--text); }
+
+    /* ─── FEEDBACK FORM PAGE ─── */
+    #page-feedback {
+      align-items: center; justify-content: center;
+      padding: 40px 20px; background: var(--bg);
+    }
+    .feedback-form-card {
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 20px; padding: 40px; width: 100%; max-width: 600px;
+      box-shadow: 0 40px 80px rgba(0,0,0,0.3);
+    }
+    .feedback-form-header { margin-bottom: 32px; }
+    .feedback-form-logo { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: var(--text3); margin-bottom: 16px; }
+    .feedback-form-title { font-size: 24px; font-weight: 800; }
+    .feedback-form-desc { color: var(--text2); font-size: 14px; margin-top: 8px; }
+    .fq-item { margin-bottom: 28px; }
+    .fq-label { font-size: 15px; font-weight: 600; margin-bottom: 14px; display: block; }
+    .fq-required { color: var(--red); margin-left: 4px; }
+    .scale-picker { display: flex; gap: 8px; }
+    .scale-btn {
+      flex: 1; padding: 14px 8px; border: 2px solid var(--border2);
+      border-radius: var(--radius-sm); background: var(--bg3);
+      color: var(--text2); font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: all 0.15s; text-align: center;
+    }
+    .scale-btn:hover { border-color: var(--accent); color: var(--accent2); background: rgba(124,92,252,0.08); }
+    .scale-btn.selected { border-color: var(--accent); background: rgba(124,92,252,0.15); color: var(--accent2); }
+    .scale-end-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--text3); margin-top: 8px; }
+    .fq-textarea {
+      width: 100%; padding: 12px 14px;
+      background: var(--bg3); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 14px;
+      outline: none; resize: vertical; min-height: 100px;
+      transition: border-color 0.2s;
+    }
+    .fq-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .radio-group { display: flex; flex-direction: column; gap: 8px; }
+    .radio-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s;
+    }
+    .radio-item:hover { border-color: var(--accent); background: rgba(124,92,252,0.05); }
+    .radio-item.selected { border-color: var(--accent); background: rgba(124,92,252,0.1); }
+    .radio-dot {
+      width: 18px; height: 18px; border: 2px solid var(--border2);
+      border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .radio-item.selected .radio-dot { border-color: var(--accent); }
+    .radio-item.selected .radio-dot::after { content: ''; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+    .anon-toggle { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--bg3); border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 28px; }
+    .anon-text h4 { font-size: 14px; font-weight: 500; }
+    .anon-text p { font-size: 13px; color: var(--text2); }
+    .progress-bar { height: 3px; background: var(--bg3); border-radius: 2px; margin-bottom: 32px; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 2px; transition: width 0.3s; }
+
+    /* ─── TOAST ─── */
+    .toast {
+      position: fixed; bottom: 28px; right: 28px;
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); padding: 14px 18px;
+      font-size: 14px; color: var(--text); z-index: 1000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      transform: translateY(100px); opacity: 0; transition: all 0.3s;
+      max-width: 300px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-left: 3px solid var(--green); }
+    .toast.error { border-left: 3px solid var(--red); }
+
+    /* ─── EMPTY STATE ─── */
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .empty-desc { color: var(--text2); font-size: 14px; margin-bottom: 24px; }
+
+    /* ─── MODAL ─── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: 20px; padding: 32px; width: 100%; max-width: 520px;
+      max-height: 90vh; overflow-y: auto;
+      transform: translateY(20px); transition: transform 0.2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .modal-title { font-size: 18px; font-weight: 800; }
+    .modal-close { width: 32px; height: 32px; border-radius: 50%; background: var(--bg3); border: none; color: var(--text2); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .modal-close:hover { background: var(--bg4); color: var(--text); }
+
+    /* ─── MISC ─── */
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .gap-2 { gap: 8px; }
+    .gap-3 { gap: 12px; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .mt-2 { margin-top: 8px; }
+    .mt-3 { margin-top: 12px; }
+    .mt-4 { margin-top: 16px; }
+    .mb-3 { margin-bottom: 12px; }
+    .text-sm { font-size: 13px; }
+    .text-xs { font-size: 12px; }
+    .text-muted { color: var(--text2); }
+    .text-accent { color: var(--accent2); }
+    .badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 3px 8px; border-radius: 4px;
+    }
+    .badge-purple { background: rgba(124,92,252,0.15); color: var(--accent2); }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid var(--border2);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.6s linear infinite; display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-screen { display: flex; align-items: center; justify-content: center; height: 200px; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     AUTH PAGE
+═══════════════════════════════════════════ -->
+<div id="page-auth" class="page active">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="8" fill="url(#lg1)"/>
+        <path d="M8 14h12M14 8v12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <defs><linearGradient id="lg1" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5cfc"/><stop offset="1" stop-color="#2dd4a0"/></linearGradient></defs>
+      </svg>
+      Easy<span>Feedback</span>
+    </div>
+    <p class="auth-tagline">Zbieraj feedback szybko i wygodnie <span style="color:var(--accent2)">#easyfeedback</span></p>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchAuthTab('login')">Logowanie</div>
+      <div class="auth-tab" onclick="switchAuthTab('register')">Rejestracja</div>
+    </div>
+
+    <!-- LOGIN -->
+    <form class="auth-form active" id="form-login" onsubmit="handleLogin(event)">
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="login-email" placeholder="ty@firma.pl" required>
+      </div>
+      <div class="field">
+        <label>Hasło</label>
+        <input type="password" id="login-password" placeholder="••••••••" required>
+      </div>
+      <div id="login-msg" class="auth-msg"></div>
+      <button type="submit" class="btn btn-primary" id="login-btn">Zaloguj się</button>
+      <div class="divider">lub</div>
+      <button type="button" class="btn btn-google" onclick="handleGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Kontynuuj z Google
+      </button>
+    </form>
+
+    <!-- REGISTER -->
+    <form class="auth-form" id="form-register" onsubmit="handleRegister(event)">
+      <div class="field">
+        <label>Imię i nazwisko</label>
+        <input type="text" id="reg-name" placeholder="Anna Kowalska" required>
+      </div>
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="reg-email" placeholder="ty@firma.pl" required>
+      </div>
+      <div class="field">
+        <label>Hasło</label>
+        <input type="password" id="reg-password" placeholder="Min. 8 znaków" required minlength="8">
+      </div>
+      <div id="reg-msg" class="auth-msg"></div>
+      <button type="submit" class="btn btn-primary" id="reg-btn">Utwórz konto</button>
+      <div class="divider">lub</div>
+      <button type="button" class="btn btn-google" onclick="handleGoogleLogin()">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Kontynuuj z Google
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MAIN APP PAGE
+═══════════════════════════════════════════ -->
+<div id="page-app" class="page">
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="8" fill="url(#lg2)"/>
+        <path d="M8 14h12M14 8v12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        <defs><linearGradient id="lg2" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5cfc"/><stop offset="1" stop-color="#2dd4a0"/></linearGradient></defs>
+      </svg>
+      Easy<span style="color:var(--accent2)">Feedback</span>
+    </div>
+
+    <div class="nav-item active" onclick="showView('rounds')" id="nav-rounds">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Moje rundy
+    </div>
+    <div class="nav-item" onclick="showView('new')" id="nav-new">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      Nowa runda
+    </div>
+    <div class="nav-item" onclick="showView('questions')" id="nav-questions">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+      Baza pytań
+    </div>
+
+    <div class="sidebar-bottom">
+      <div class="theme-toggle" onclick="toggleTheme()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="theme-icon"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <span id="theme-label">Jasny motyw</span>
+      </div>
+      <div class="user-pill" id="user-pill">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-name" id="user-name">Ładowanie...</div>
+      </div>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:13px" onclick="handleLogout()">Wyloguj się</button>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- View: Rounds -->
+    <div class="view active" id="view-rounds">
+      <div class="main-header">
+        <div>
+          <h1 class="main-title">Moje rundy feedbacku</h1>
+          <p class="main-subtitle">Historia i aktywne zbiórki feedbacku o Tobie</p>
+        </div>
+        <button class="btn btn-primary" onclick="showView('new')">+ Nowa runda</button>
+      </div>
+      <div class="content-area">
+        <div id="rounds-container">
+          <div class="loading-screen"><div class="spinner"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View: New Round -->
+    <div class="view" id="view-new">
+      <div class="main-header">
+        <div>
+          <h1 class="main-title">Nowa runda feedbacku</h1>
+          <p class="main-subtitle">Stwórz formularz i wyślij link do wybranych osób</p>
+        </div>
+      </div>
+      <div class="content-area">
+        <div style="max-width:720px">
+
+          <!-- Step 1: Basic info -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="form-section">
+              <h3>Podstawowe informacje</h3>
+              <div style="margin-bottom:16px">
+                <label class="form-label">Nazwa rundy</label>
+                <input class="form-input" id="round-name" placeholder="np. Feedback Q2 2025, Ocena roczna...">
+              </div>
+              <div>
+                <label class="form-label">Deadline (opcjonalnie)</label>
+                <input class="form-input" type="date" id="round-deadline">
+              </div>
+            </div>
+
+            <div class="form-section">
+              <h3>Ustawienia prywatności</h3>
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <h4>Anonimowe odpowiedzi</h4>
+                  <p>Respondenci mogą wybrać czy podpisać swoją odpowiedź</p>
+                </div>
+                <div class="toggle on" id="toggle-anon" onclick="this.classList.toggle('on')"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Questions -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="form-section">
+              <div class="flex justify-between items-center mb-3">
+                <h3 style="margin-bottom:0">Pytania</h3>
+                <button class="btn btn-secondary" style="font-size:13px;padding:8px 14px" onclick="openCustomQuestionModal()">+ Własne pytanie</button>
+              </div>
+              <p class="text-sm text-muted" style="margin-bottom:14px">Wybierz z bazy lub dodaj własne pytania</p>
+
+              <div class="question-bank" id="question-bank">
+                <!-- populated by JS -->
+              </div>
+            </div>
+
+            <div id="selected-questions-area" style="display:none">
+              <h3 style="margin-bottom:12px; font-size:14px; color:var(--text2)">Wybrane pytania (<span id="selected-count">0</span>)</h3>
+              <div class="selected-questions" id="selected-questions-list"></div>
+            </div>
+          </div>
+
+          <div class="flex gap-2" style="justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="showView('rounds')">Anuluj</button>
+            <button class="btn btn-primary" onclick="createRound()">Utwórz rundę →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View: Questions Bank Admin -->
+    <div class="view" id="view-questions">
+      <div class="main-header">
+        <div>
+          <h1 class="main-title">Baza pytań</h1>
+          <p class="main-subtitle">Zarządzaj pulą pytań dostępnych dla wszystkich</p>
+        </div>
+        <button class="btn btn-primary" onclick="openAddQuestionModal()">+ Dodaj pytanie</button>
+      </div>
+      <div class="content-area" id="questions-admin-container">
+        <div class="loading-screen"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- View: Round Detail / Results -->
+    <div class="view" id="view-detail">
+      <div class="main-header" id="detail-header">
+        <div>
+          <button class="btn btn-ghost" style="margin-bottom:8px;padding:6px 12px;font-size:13px" onclick="showView('rounds')">← Wróć</button>
+          <h1 class="main-title" id="detail-title">Nazwa rundy</h1>
+          <p class="main-subtitle" id="detail-subtitle"></p>
+        </div>
+        <div class="flex gap-2" id="detail-actions"></div>
+      </div>
+      <div class="content-area" id="detail-content">
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     FEEDBACK FORM PAGE (public)
+═══════════════════════════════════════════ -->
+<div id="page-feedback" class="page">
+  <div class="feedback-form-card" id="feedback-form-card">
+    <div class="loading-screen"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-custom-question">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Własne pytanie</h2>
+      <button class="modal-close" onclick="closeModal('modal-custom-question')">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <label class="form-label">Treść pytania</label>
+        <input class="form-input" id="cq-text" placeholder="Wpisz swoje pytanie...">
+      </div>
+      <div>
+        <label class="form-label">Kategoria</label>
+        <input class="form-input" id="cq-category" placeholder="np. Performance, Kultura...">
+      </div>
+      <div>
+        <label class="form-label">Typ pytania</label>
+        <select class="form-select" id="cq-type">
+          <option value="scale">Skala 1–5</option>
+          <option value="open">Otwarte (tekst)</option>
+          <option value="closed">Zamknięte (tak/nie)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="addCustomQuestion()">Dodaj pytanie</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-add-question">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Dodaj pytanie do bazy</h2>
+      <button class="modal-close" onclick="closeModal('modal-add-question')">×</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <label class="form-label">Treść pytania</label>
+        <textarea class="form-textarea" id="aq-text" placeholder="Wpisz treść pytania..."></textarea>
+      </div>
+      <div>
+        <label class="form-label">Kategoria</label>
+        <select class="form-select" id="aq-category">
+          <option value="Performance">Performance</option>
+          <option value="Kultura">Kultura organizacyjna</option>
+          <option value="Seniority">Seniority & samodzielność</option>
+          <option value="Zaangażowanie">Zaangażowanie</option>
+          <option value="Inne">Inne</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Typ pytania</label>
+        <select class="form-select" id="aq-type">
+          <option value="scale">Skala 1–5</option>
+          <option value="open">Otwarte (tekst)</option>
+          <option value="closed">Zamknięte (tak/nie)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="saveQuestionToBank()">Zapisz pytanie</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG — WKLEJ SWOJE KLUCZE
+// ═══════════════════════════════════════════
+const SUPABASE_URL = 'https://hyqttnjvycnfafcdrkli.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_pU-gbxhKqbgXpKH-vVNqfw_Sg5QRMPR';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ═══════════════════════════════════════════
+// DEFAULT QUESTION BANK (Publink values)
+// ═══════════════════════════════════════════
+const DEFAULT_QUESTIONS = [
+  // Performance
+  { category: 'Performance', text: 'Jak oceniasz jakość pracy tej osoby w ostatnim okresie?', type: 'scale' },
+  { category: 'Performance', text: 'Czy ta osoba regularnie dostarcza wyniki na czas?', type: 'scale' },
+  { category: 'Performance', text: 'Co możesz wskazać jako największy atut tej osoby w pracy?', type: 'open' },
+  // Seniority & Samodzielność
+  { category: 'Seniority', text: 'Jak oceniasz samodzielność tej osoby w realizacji zadań?', type: 'scale' },
+  { category: 'Seniority', text: 'Czy ta osoba podejmuje decyzje w odpowiedniej skali do swojego poziomu?', type: 'scale' },
+  { category: 'Seniority', text: 'Jak oceniasz poziom ekspertyzy technicznej / merytorycznej tej osoby?', type: 'scale' },
+  // Proaktywność
+  { category: 'Zaangażowanie', text: 'Jak oceniasz proaktywność tej osoby — czy wychodzi z inicjatywą?', type: 'scale' },
+  { category: 'Zaangażowanie', text: 'Czy ta osoba angażuje się w projekty i tematy poza swoim zakresem obowiązków?', type: 'closed' },
+  { category: 'Zaangażowanie', text: 'Opisz sytuację, w której ta osoba wykazała się wyjątkowym zaangażowaniem.', type: 'open' },
+  // Kultura
+  { category: 'Kultura', text: 'Jak oceniasz kulturę feedbacku tej osoby — czy daje i przyjmuje feedback konstruktywnie?', type: 'scale' },
+  { category: 'Kultura', text: 'Czy ta osoba działa zgodnie z wartościami Publink?', type: 'closed' },
+  { category: 'Kultura', text: 'Co poradziłbyś/abyś tej osobie, żeby się rozwijała?', type: 'open' },
+];
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let currentUser = null;
+let allQuestions = [...DEFAULT_QUESTIONS.map((q,i) => ({...q, id: 'default_'+i}))];
+let selectedQuestions = [];
+let currentRoundId = null;
+let feedbackAnswers = {};
+let feedbackAnonymous = false;
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+async function init() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#feedback/')) {
+    const roundId = hash.replace('#feedback/', '');
+    showPage('feedback');
+    await loadFeedbackForm(roundId);
+    return;
+  }
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    await enterApp();
+  } else {
+    showPage('auth');
+  }
+
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      currentUser = session.user;
+      await enterApp();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      showPage('auth');
+    }
+  });
+}
+
+async function enterApp() {
+  showPage('app');
+  const name = currentUser.user_metadata?.full_name || currentUser.email.split('@')[0];
+  document.getElementById('user-name').textContent = name;
+  document.getElementById('user-avatar').textContent = name[0].toUpperCase();
+  await loadRounds();
+  renderQuestionBank();
+}
+
+// ═══════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && tab==='login') || (i===1 && tab==='register'));
+  });
+  document.getElementById('form-login').classList.toggle('active', tab==='login');
+  document.getElementById('form-register').classList.toggle('active', tab==='register');
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const msg = document.getElementById('login-msg');
+  btn.disabled = true; btn.textContent = 'Logowanie...';
+  msg.className = 'auth-msg';
+
+  const { error } = await sb.auth.signInWithPassword({
+    email: document.getElementById('login-email').value,
+    password: document.getElementById('login-password').value,
+  });
+
+  if (error) {
+    msg.textContent = 'Nieprawidłowy e-mail lub hasło.';
+    msg.className = 'auth-msg error';
+  }
+  btn.disabled = false; btn.textContent = 'Zaloguj się';
+}
+
+async function handleRegister(e) {
+  e.preventDefault();
+  const btn = document.getElementById('reg-btn');
+  const msg = document.getElementById('reg-msg');
+  btn.disabled = true; btn.textContent = 'Tworzenie konta...';
+  msg.className = 'auth-msg';
+
+  const { error } = await sb.auth.signUp({
+    email: document.getElementById('reg-email').value,
+    password: document.getElementById('reg-password').value,
+    options: { data: { full_name: document.getElementById('reg-name').value } }
+  });
+
+  if (error) {
+    msg.textContent = error.message;
+    msg.className = 'auth-msg error';
+  } else {
+    msg.textContent = 'Sprawdź skrzynkę e-mail i potwierdź konto!';
+    msg.className = 'auth-msg success';
+  }
+  btn.disabled = false; btn.textContent = 'Utwórz konto';
+}
+
+async function handleGoogleLogin() {
+  await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+}
+
+async function handleLogout() {
+  await sb.auth.signOut();
+}
+
+// ═══════════════════════════════════════════
+// ROUNDS
+// ═══════════════════════════════════════════
+async function loadRounds() {
+  const container = document.getElementById('rounds-container');
+
+  // Load from localStorage (no DB tables needed yet)
+  const rounds = getRounds();
+
+  if (rounds.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📬</div>
+        <h2 class="empty-title">Brak rund feedbacku</h2>
+        <p class="empty-desc">Stwórz swoją pierwszą rundę i zbieraj feedback od zespołu</p>
+        <button class="btn btn-primary" onclick="showView('new')">Stwórz pierwszą rundę</button>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r)).join('')}</div>`;
+}
+
+function getRounds() {
+  if (!currentUser) return [];
+  const key = `ef_rounds_${currentUser.id}`;
+  return JSON.parse(localStorage.getItem(key) || '[]');
+}
+
+function saveRounds(rounds) {
+  const key = `ef_rounds_${currentUser.id}`;
+  localStorage.setItem(key, JSON.stringify(rounds));
+}
+
+function renderRoundCard(round) {
+  const responses = getResponses(round.id);
+  const isOpen = round.status === 'open';
+  const date = new Date(round.created_at).toLocaleDateString('pl-PL', {day:'numeric',month:'long',year:'numeric'});
+  return `
+    <div class="round-card" onclick="showRoundDetail('${round.id}')">
+      <div class="round-status ${isOpen ? 'open' : 'closed'}">${isOpen ? 'Aktywna' : 'Zamknięta'}</div>
+      <div class="round-title">${round.name}</div>
+      <div class="round-meta">Utworzona <span>${date}</span></div>
+      ${round.deadline ? `<div class="round-meta">Deadline: <span>${new Date(round.deadline).toLocaleDateString('pl-PL')}</span></div>` : ''}
+      <div class="round-footer">
+        <div class="round-responses">Odpowiedzi: <strong>${responses.length}</strong></div>
+        <div class="badge badge-purple">${round.questions?.length || 0} pytań</div>
+      </div>
+    </div>`;
+}
+
+async function createRound() {
+  const name = document.getElementById('round-name').value.trim();
+  if (!name) { showToast('Podaj nazwę rundy', 'error'); return; }
+  if (selectedQuestions.length === 0) { showToast('Wybierz co najmniej jedno pytanie', 'error'); return; }
+
+  const deadline = document.getElementById('round-deadline').value;
+  const allowAnon = document.getElementById('toggle-anon').classList.contains('on');
+
+  const round = {
+    id: 'round_' + Date.now(),
+    name,
+    deadline: deadline || null,
+    allow_anonymous: allowAnon,
+    status: 'open',
+    created_at: new Date().toISOString(),
+    user_id: currentUser.id,
+    questions: selectedQuestions.map(q => ({...q}))
+  };
+
+  const rounds = getRounds();
+  rounds.unshift(round);
+  saveRounds(rounds);
+
+  showToast('Runda utworzona! 🎉', 'success');
+  selectedQuestions = [];
+  document.getElementById('round-name').value = '';
+  document.getElementById('round-deadline').value = '';
+  renderSelectedQuestions();
+  renderQuestionBank();
+  await loadRounds();
+  showView('rounds');
+}
+
+// ═══════════════════════════════════════════
+// ROUND DETAIL
+// ═══════════════════════════════════════════
+function showRoundDetail(roundId) {
+  currentRoundId = roundId;
+  const rounds = getRounds();
+  const round = rounds.find(r => r.id === roundId);
+  if (!round) return;
+
+  const responses = getResponses(roundId);
+  const isOpen = round.status === 'open';
+  const feedbackUrl = `${window.location.origin}${window.location.pathname}#feedback/${roundId}`;
+
+  document.getElementById('detail-title').textContent = round.name;
+  document.getElementById('detail-subtitle').textContent = `${responses.length} odpowiedzi · ${round.questions.length} pytań`;
+
+  // Actions
+  const actions = document.getElementById('detail-actions');
+  actions.innerHTML = isOpen
+    ? `<button class="btn btn-danger" onclick="closeRound('${roundId}')">Zamknij rundę</button>`
+    : `<span class="badge badge-green" style="padding:8px 14px;font-size:12px">Zakończona</span>`;
+
+  const content = document.getElementById('detail-content');
+
+  // Link section
+  let html = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="flex items-center gap-2 mb-3">
+        <h3 style="font-size:15px;font-weight:700">Link do formularza</h3>
+        ${isOpen ? '<span class="badge badge-green">aktywny</span>' : '<span class="badge" style="background:var(--bg3);color:var(--text3)">nieaktywny</span>'}
+      </div>
+      <p class="text-sm text-muted" style="margin-bottom:12px">Wyślij ten link osobom, które mają wypełnić feedback o Tobie</p>
+      <div class="copy-box">
+        <span class="copy-url">${feedbackUrl}</span>
+        <button class="btn btn-secondary copy-btn" onclick="copyLink('${feedbackUrl}')">Kopiuj</button>
+      </div>
+    </div>`;
+
+  // Stats
+  html += `
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value">${responses.length}</div>
+        <div class="stat-label">Odpowiedzi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${round.questions.length}</div>
+        <div class="stat-label">Pytań</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${responses.filter(r=>r.anonymous).length}</div>
+        <div class="stat-label">Anonimowych</div>
+      </div>
+    </div>`;
+
+  if (responses.length > 0) {
+    // AI Summary placeholder
+    html += `
+      <div class="ai-summary">
+        <div class="ai-summary-header">
+          <div class="ai-badge">✦ AI</div>
+          <span style="font-size:14px;font-weight:600">Podsumowanie feedbacku</span>
+        </div>
+        <div class="ai-summary-text" id="ai-summary-text">
+          ${generateAISummary(round, responses)}
+        </div>
+      </div>`;
+
+    // Results per question
+    html += `<div class="card">`;
+    round.questions.forEach((q, qi) => {
+      const qResponses = responses.map(r => r.answers[qi]).filter(a => a !== undefined && a !== '');
+      html += `<div class="question-result" style="${qi > 0 ? 'border-top:1px solid var(--border);padding-top:24px;' : ''}">`;
+      html += `<div class="qr-header"><div class="qr-text">${q.text}</div>`;
+
+      if (q.type === 'scale') {
+        const nums = qResponses.filter(a => typeof a === 'number');
+        const avg = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1) : '-';
+        html += `<div class="qr-avg">${avg}<span style="font-size:14px;color:var(--text3)">/5</span></div>`;
+        html += `</div>`;
+        // Bar
+        const avgNum = parseFloat(avg);
+        html += `<div class="scale-bar">`;
+        for (let i=1;i<=5;i++) {
+          html += `<div class="scale-segment${i<=Math.round(avgNum)?' filled':''}"></div>`;
+        }
+        html += `</div><div class="scale-labels"><span>1 — Słabo</span><span>5 — Doskonale</span></div>`;
+        // Distribution
+        html += `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">`;
+        for (let i=1;i<=5;i++) {
+          const count = nums.filter(n=>n===i).length;
+          html += `<div style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--text2)">
+            <span style="font-weight:700;color:var(--text)">${i}</span>: ${count}x
+          </div>`;
+        }
+        html += `</div>`;
+
+      } else if (q.type === 'closed') {
+        const yes = qResponses.filter(a=>a==='tak').length;
+        const no = qResponses.filter(a=>a==='nie').length;
+        html += `</div>`;
+        html += `<div style="display:flex;gap:16px;margin-top:8px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:var(--green);display:inline-block"></span><span class="text-sm">Tak: <strong>${yes}</strong></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:var(--red);display:inline-block"></span><span class="text-sm">Nie: <strong>${no}</strong></span></div>
+        </div>`;
+
+      } else {
+        html += `</div>`;
+        html += `<div class="open-responses">`;
+        qResponses.forEach((resp, ri) => {
+          const respObj = responses[ri];
+          const who = respObj?.anonymous ? 'Anonimowo' : (respObj?.respondent_name || 'Nieznany');
+          html += `<div class="open-response">${resp}<div class="open-response-meta">${who}</div></div>`;
+        });
+        html += `</div>`;
+      }
+      html += `</div>`;
+    });
+    html += `</div>`;
+
+  } else {
+    html += `
+      <div class="card">
+        <div class="empty-state" style="padding:40px 20px">
+          <div class="empty-icon">📭</div>
+          <h2 class="empty-title">Brak odpowiedzi</h2>
+          <p class="empty-desc">Wyślij link do formularza i poczekaj na feedback</p>
+        </div>
+      </div>`;
+  }
+
+  content.innerHTML = html;
+  showView('detail');
+}
+
+function closeRound(roundId) {
+  const rounds = getRounds();
+  const idx = rounds.findIndex(r => r.id === roundId);
+  if (idx !== -1) {
+    rounds[idx].status = 'closed';
+    saveRounds(rounds);
+    showToast('Runda zamknięta', 'success');
+    showRoundDetail(roundId);
+  }
+}
+
+function generateAISummary(round, responses) {
+  if (responses.length === 0) return 'Brak danych.';
+  const scaleQs = round.questions.filter(q => q.type === 'scale');
+  let summary = '';
+  if (scaleQs.length > 0) {
+    const avgs = scaleQs.map((q, i) => {
+      const qi = round.questions.indexOf(q);
+      const nums = responses.map(r => r.answers[qi]).filter(a => typeof a === 'number');
+      return nums.length ? nums.reduce((a,b)=>a+b,0)/nums.length : null;
+    }).filter(Boolean);
+    const overallAvg = avgs.length ? (avgs.reduce((a,b)=>a+b,0)/avgs.length).toFixed(1) : null;
+    if (overallAvg) {
+      const level = overallAvg >= 4.5 ? 'bardzo wysoko' : overallAvg >= 3.5 ? 'wysoko' : overallAvg >= 2.5 ? 'średnio' : 'nisko';
+      summary += `Na podstawie <strong>${responses.length} odpowiedzi</strong>, Twój zespół ocenia Cię ogólnie <strong>${level}</strong> (średnia: ${overallAvg}/5). `;
+    }
+  }
+  const openQs = round.questions.filter(q => q.type === 'open');
+  if (openQs.length > 0) {
+    summary += `Zebrano ${responses.filter(r => openQs.some((q,i) => r.answers[round.questions.indexOf(q)])).length} komentarzy otwartych — sprawdź szczegóły poniżej.`;
+  }
+  return summary || 'Feedback zebrany. Przejrzyj wyniki poniżej.';
+}
+
+function copyLink(url) {
+  navigator.clipboard.writeText(url);
+  showToast('Link skopiowany! 📋', 'success');
+}
+
+// ═══════════════════════════════════════════
+// QUESTION BANK
+// ═══════════════════════════════════════════
+function renderQuestionBank() {
+  const container = document.getElementById('question-bank');
+  if (!container) return;
+
+  const categories = [...new Set(allQuestions.map(q => q.category))];
+  let html = '';
+  categories.forEach(cat => {
+    html += `<div class="qbank-category">${cat}</div>`;
+    allQuestions.filter(q => q.category === cat).forEach(q => {
+      const sel = selectedQuestions.find(s => s.id === q.id);
+      html += `
+        <div class="qbank-item${sel ? ' selected' : ''}" onclick="toggleQuestion('${q.id}')">
+          <div class="qbank-checkbox"></div>
+          <div class="qbank-text">${q.text}</div>
+          <div class="qbank-type">${typeLabel(q.type)}</div>
+        </div>`;
+    });
+  });
+  container.innerHTML = html;
+}
+
+function typeLabel(type) {
+  return type === 'scale' ? '1–5' : type === 'open' ? 'Tekst' : 'Tak/Nie';
+}
+
+function toggleQuestion(qId) {
+  const q = allQuestions.find(q => q.id === qId);
+  if (!q) return;
+  const idx = selectedQuestions.findIndex(s => s.id === qId);
+  if (idx !== -1) {
+    selectedQuestions.splice(idx, 1);
+  } else {
+    selectedQuestions.push({...q});
+  }
+  renderQuestionBank();
+  renderSelectedQuestions();
+}
+
+function renderSelectedQuestions() {
+  const area = document.getElementById('selected-questions-area');
+  const list = document.getElementById('selected-questions-list');
+  const count = document.getElementById('selected-count');
+  if (!area) return;
+
+  if (selectedQuestions.length === 0) {
+    area.style.display = 'none';
+    return;
+  }
+  area.style.display = 'block';
+  count.textContent = selectedQuestions.length;
+  list.innerHTML = selectedQuestions.map((q, i) => `
+    <div class="sq-item">
+      <div class="sq-drag">⠿</div>
+      <div class="sq-content">
+        <div class="sq-text">${q.text}</div>
+        <div class="sq-type">${typeLabel(q.type)}</div>
+      </div>
+      <div class="sq-remove" onclick="removeSelectedQuestion(${i})">×</div>
+    </div>`).join('');
+}
+
+function removeSelectedQuestion(idx) {
+  selectedQuestions.splice(idx, 1);
+  renderQuestionBank();
+  renderSelectedQuestions();
+}
+
+function openCustomQuestionModal() {
+  openModal('modal-custom-question');
+}
+
+function addCustomQuestion() {
+  const text = document.getElementById('cq-text').value.trim();
+  const category = document.getElementById('cq-category').value.trim() || 'Inne';
+  const type = document.getElementById('cq-type').value;
+  if (!text) { showToast('Wpisz treść pytania', 'error'); return; }
+
+  const q = { id: 'custom_' + Date.now(), text, category, type };
+  allQuestions.push(q);
+  selectedQuestions.push({...q});
+  closeModal('modal-custom-question');
+  document.getElementById('cq-text').value = '';
+  renderQuestionBank();
+  renderSelectedQuestions();
+  showToast('Pytanie dodane ✓', 'success');
+}
+
+// Questions Admin
+function loadQuestionsAdmin() {
+  const container = document.getElementById('questions-admin-container');
+  const categories = [...new Set(allQuestions.map(q => q.category))];
+  let html = '';
+  categories.forEach(cat => {
+    html += `<div class="card" style="margin-bottom:16px">
+      <h3 style="margin-bottom:16px;font-size:15px">${cat}</h3>`;
+    allQuestions.filter(q => q.category === cat).forEach(q => {
+      html += `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1;font-size:14px">${q.text}</div>
+          <div class="badge badge-purple">${typeLabel(q.type)}</div>
+          ${q.id.startsWith('custom_') || !q.id.startsWith('default_') ? `<button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>` : ''}
+        </div>`;
+    });
+    html += `</div>`;
+  });
+  container.innerHTML = html;
+}
+
+function openAddQuestionModal() {
+  openModal('modal-add-question');
+}
+
+function saveQuestionToBank() {
+  const text = document.getElementById('aq-text').value.trim();
+  const category = document.getElementById('aq-category').value;
+  const type = document.getElementById('aq-type').value;
+  if (!text) { showToast('Wpisz treść pytania', 'error'); return; }
+
+  const q = { id: 'admin_' + Date.now(), text, category, type };
+  allQuestions.push(q);
+  closeModal('modal-add-question');
+  document.getElementById('aq-text').value = '';
+  loadQuestionsAdmin();
+  showToast('Pytanie dodane do bazy ✓', 'success');
+}
+
+function deleteQuestion(qId) {
+  allQuestions = allQuestions.filter(q => q.id !== qId);
+  loadQuestionsAdmin();
+  showToast('Pytanie usunięte', 'success');
+}
+
+// ═══════════════════════════════════════════
+// FEEDBACK FORM (public)
+// ═══════════════════════════════════════════
+function getRoundById(roundId) {
+  // Search all users' rounds (public form — we need to find the round somehow)
+  // For now we store in localStorage under the round id directly
+  const key = `ef_round_public_${roundId}`;
+  let round = JSON.parse(localStorage.getItem(key) || 'null');
+  if (!round) {
+    // Search all ef_rounds keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('ef_rounds_')) {
+        const rounds = JSON.parse(localStorage.getItem(k) || '[]');
+        const found = rounds.find(r => r.id === roundId);
+        if (found) { round = found; localStorage.setItem(key, JSON.stringify(found)); break; }
+      }
+    }
+  }
+  return round;
+}
+
+async function loadFeedbackForm(roundId) {
+  const card = document.getElementById('feedback-form-card');
+  const round = getRoundById(roundId);
+
+  if (!round) {
+    card.innerHTML = `
+      <div style="text-align:center;padding:40px">
+        <div style="font-size:48px;margin-bottom:16px">🔍</div>
+        <h2 style="font-family:'Syne',sans-serif;margin-bottom:8px">Nie znaleziono formularza</h2>
+        <p style="color:var(--text2)">Link może być nieaktualny lub runda została usunięta.</p>
+      </div>`;
+    return;
+  }
+
+  if (round.status === 'closed') {
+    card.innerHTML = `
+      <div style="text-align:center;padding:40px">
+        <div style="font-size:48px;margin-bottom:16px">🔒</div>
+        <h2 style="font-family:'Syne',sans-serif;margin-bottom:8px">Ta runda jest zamknięta</h2>
+        <p style="color:var(--text2)">Zbieranie feedbacku zostało zakończone.</p>
+      </div>`;
+    return;
+  }
+
+  renderFeedbackFormStep(round, 0);
+}
+
+function getResponses(roundId) {
+  return JSON.parse(localStorage.getItem(`ef_responses_${roundId}`) || '[]');
+}
+
+function saveResponse(roundId, response) {
+  const responses = getResponses(roundId);
+  responses.push(response);
+  localStorage.setItem(`ef_responses_${roundId}`, JSON.stringify(responses));
+}
+
+let fbRound = null;
+let fbCurrentQ = 0;
+let fbAnswers = {};
+let fbAnon = true;
+let fbName = '';
+
+function renderFeedbackFormStep(round, step) {
+  fbRound = round;
+  fbCurrentQ = step;
+  const card = document.getElementById('feedback-form-card');
+  const total = round.questions.length;
+  const progress = Math.round((step / total) * 100);
+
+  if (step === 0) {
+    // Intro + anon choice
+    card.innerHTML = `
+      <div class="feedback-form-header">
+        <div class="feedback-form-logo">EasyFeedback</div>
+        <h1 class="feedback-form-title">${round.name}</h1>
+        <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
+      </div>
+      ${round.allow_anonymous ? `
+      <div class="anon-toggle" onclick="fbAnon=!fbAnon;this.querySelector('.toggle').classList.toggle('on')" style="margin-bottom:24px">
+        <div class="toggle on"></div>
+        <div class="anon-text">
+          <h4>Odpowiedz anonimowo</h4>
+          <p>Twoje imię nie będzie widoczne dla odbiorcy</p>
+        </div>
+      </div>` : ''}
+      <div id="name-field" style="margin-bottom:24px;display:${round.allow_anonymous ? 'none' : 'block'}">
+        <label class="form-label">Twoje imię i nazwisko</label>
+        <input class="form-input" id="fb-name" placeholder="np. Jan Kowalski">
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
+
+    // Toggle anon field visibility
+    if (round.allow_anonymous) {
+      const anonToggle = card.querySelector('.anon-toggle');
+      const nameField = card.querySelector('#name-field');
+      if (anonToggle) {
+        anonToggle.addEventListener('click', () => {
+          fbAnon = !anonToggle.querySelector('.toggle').classList.contains('on');
+          nameField.style.display = fbAnon ? 'none' : 'block';
+        });
+      }
+    }
+    return;
+  }
+
+  if (step > total) {
+    // Thank you
+    card.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:56px;margin-bottom:20px">🙌</div>
+        <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
+        <p style="color:var(--text2);font-size:15px">Twój feedback został zapisany. Pomożesz tej osobie się rozwijać.</p>
+      </div>`;
+
+    // Save
+    const response = {
+      id: 'resp_' + Date.now(),
+      round_id: round.id,
+      submitted_at: new Date().toISOString(),
+      anonymous: fbAnon,
+      respondent_name: fbAnon ? null : fbName,
+      answers: fbAnswers
+    };
+    saveResponse(round.id, response);
+    return;
+  }
+
+  const q = round.questions[step - 1];
+  const qi = step - 1;
+
+  let answerHtml = '';
+  if (q.type === 'scale') {
+    answerHtml = `
+      <div class="scale-picker" id="scale-picker">
+        ${[1,2,3,4,5].map(n => `<button class="scale-btn${fbAnswers[qi]===n?' selected':''}" onclick="setScaleAnswer(${qi},${n})">${n}</button>`).join('')}
+      </div>
+      <div class="scale-end-labels"><span>Słabo</span><span>Doskonale</span></div>`;
+  } else if (q.type === 'open') {
+    answerHtml = `<textarea class="fq-textarea" id="open-answer" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
+  } else if (q.type === 'closed') {
+    answerHtml = `
+      <div class="radio-group">
+        <div class="radio-item${fbAnswers[qi]==='tak'?' selected':''}" onclick="setClosedAnswer(${qi},'tak')">
+          <div class="radio-dot"></div><span>Tak</span>
+        </div>
+        <div class="radio-item${fbAnswers[qi]==='nie'?' selected':''}" onclick="setClosedAnswer(${qi},'nie')">
+          <div class="radio-dot"></div><span>Nie</span>
+        </div>
+      </div>`;
+  }
+
+  card.innerHTML = `
+    <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+    <div class="feedback-form-header" style="margin-bottom:24px">
+      <div class="feedback-form-logo" style="font-size:12px">Pytanie ${step} z ${total}</div>
+    </div>
+    <div class="fq-item">
+      <span class="fq-label">${q.text}</span>
+      ${answerHtml}
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:28px">
+      <button class="btn btn-secondary" onclick="renderFeedbackFormStep(fbRound, ${step-1})">${step===1?'Wróć':'← Wróć'}</button>
+      <button class="btn btn-primary" onclick="nextFeedbackStep(${step},${qi})">${step===total?'Wyślij feedback ✓':'Dalej →'}</button>
+    </div>`;
+}
+
+function startFeedback() {
+  fbAnon = document.querySelector('.anon-toggle .toggle')?.classList.contains('on') ?? true;
+  fbName = document.getElementById('fb-name')?.value || '';
+  renderFeedbackFormStep(fbRound, 1);
+}
+
+function setScaleAnswer(qi, val) {
+  fbAnswers[qi] = val;
+  document.querySelectorAll('.scale-btn').forEach((btn, i) => {
+    btn.classList.toggle('selected', i+1 === val);
+  });
+}
+
+function setClosedAnswer(qi, val) {
+  fbAnswers[qi] = val;
+  document.querySelectorAll('.radio-item').forEach(item => {
+    item.classList.toggle('selected', item.querySelector('span').textContent.toLowerCase() === val);
+    const dot = item.querySelector('.radio-dot');
+    if (dot) {
+      dot.innerHTML = item.classList.contains('selected') ? '<span style="width:8px;height:8px;background:var(--accent);border-radius:50%;display:block"></span>' : '';
+    }
+  });
+}
+
+function nextFeedbackStep(step, qi) {
+  const q = fbRound.questions[qi];
+  // Collect open answer if any
+  const openEl = document.getElementById('open-answer');
+  if (openEl) fbAnswers[qi] = openEl.value;
+
+  renderFeedbackFormStep(fbRound, step + 1);
+}
+
+// ═══════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  const navEl = document.getElementById('nav-' + name);
+  if (navEl) navEl.classList.add('active');
+
+  if (name === 'new') { renderQuestionBank(); renderSelectedQuestions(); }
+  if (name === 'questions') loadQuestionsAdmin();
+  if (name === 'rounds') loadRounds();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+let toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-label').textContent = isDark ? 'Ciemny motyw' : 'Jasny motyw';
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ═══════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════
+init();
+</script>
+</body>
+</html>
