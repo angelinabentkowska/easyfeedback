@@ -160,10 +160,12 @@
       position: sticky; top: 0; height: 100vh;
     }
     .sidebar-logo {
-      font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800;
-      padding: 0 20px 24px; border-bottom: 1px solid var(--border);
-      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+      font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800;
+      padding: 0 20px 20px; border-bottom: 1px solid var(--border);
+      margin-bottom: 16px; display: flex; align-items: center; gap: 6px;
+      cursor: pointer; white-space: nowrap; overflow: hidden;
     }
+    .sidebar-logo:hover { opacity: 0.8; }
     .sidebar-logo span { color: var(--accent2); }
     .nav-item {
       display: flex; align-items: center; gap: 10px;
@@ -564,8 +566,8 @@
 <div id="page-app" class="page">
   <!-- Sidebar -->
   <nav class="sidebar">
-    <div class="sidebar-logo">
-      <svg width="22" height="22" viewBox="0 0 28 28" fill="none">
+    <div class="sidebar-logo" onclick="showView('rounds')">
+      <svg width="20" height="20" viewBox="0 0 28 28" fill="none" style="flex-shrink:0">
         <rect width="28" height="28" rx="8" fill="url(#lg2)"/>
         <path d="M8 14h12M14 8v12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
         <defs><linearGradient id="lg2" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse"><stop stop-color="#7c5cfc"/><stop offset="1" stop-color="#2dd4a0"/></linearGradient></defs>
@@ -795,7 +797,6 @@
 // ═══════════════════════════════════════════
 const SUPABASE_URL = 'https://hyqttnjvycnfafcdrkli.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_pU-gbxhKqbgXpKH-vVNqfw_Sg5QRMPR';
-
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
