@@ -802,13 +802,13 @@
       <div>
         <label class="form-label">Kategoria</label>
         <select class="form-select" id="cq-category">
-          <option value="Performance">Performance</option>
-          <option value="Seniority i samodzielność">Seniority i samodzielność</option>
-          <option value="Zaangażowanie i inicjatywa">Zaangażowanie i inicjatywa</option>
-          <option value="Kultura i postawa">Kultura i postawa</option>
-          <option value="Ja w roli">Ja w roli</option>
-          <option value="Pytanie otwarte">Pytanie otwarte</option>
-          <option value="Inne">Inne</option>
+          <option value="SAMODZIELNOŚĆ">Samodzielność</option>
+          <option value="SENIORITY">Seniority</option>
+          <option value="INICJATYWA I PROAKTYWNOŚĆ">Inicjatywa i proaktywność</option>
+          <option value="KOMUNIKACJA I FEEDBACK">Komunikacja i feedback</option>
+          <option value="KULTURA I WARTOŚCI">Kultura i wartości</option>
+          <option value="WPŁYW I OUTCOMES">Wpływ i outcomes</option>
+          <option value="JA W SWOJEJ ROLI">Ja w swojej roli</option>
         </select>
       </div>
       <div>
@@ -838,11 +838,13 @@
       <div>
         <label class="form-label">Kategoria</label>
         <select class="form-select" id="aq-category">
-          <option value="Performance">Performance</option>
-          <option value="Kultura">Kultura organizacyjna</option>
-          <option value="Seniority">Seniority & samodzielność</option>
-          <option value="Zaangażowanie">Zaangażowanie</option>
-          <option value="Inne">Inne</option>
+          <option value="SAMODZIELNOŚĆ">Samodzielność</option>
+          <option value="SENIORITY">Seniority</option>
+          <option value="INICJATYWA I PROAKTYWNOŚĆ">Inicjatywa i proaktywność</option>
+          <option value="KOMUNIKACJA I FEEDBACK">Komunikacja i feedback</option>
+          <option value="KULTURA I WARTOŚCI">Kultura i wartości</option>
+          <option value="WPŁYW I OUTCOMES">Wpływ i outcomes</option>
+          <option value="JA W SWOJEJ ROLI">Ja w swojej roli</option>
         </select>
       </div>
       <div>
@@ -884,19 +886,19 @@ const TEMPLATES = {
     name: '3 miesiące',
     desc: 'Orientacja i pierwsze wrażenie',
     questions: [
-      { category: 'Seniority i samodzielność', text: 'Czy zauważasz, że działam samodzielnie — szukam rozwiązań zanim poproszę o pomoc?', type: 'scale' },
-      { category: 'Seniority i samodzielność', text: 'Czy potrafię zaplanować i zorganizować swoją pracę bez potrzeby ustalania każdego kroku z innymi?', type: 'scale' },
-      { category: 'Seniority i samodzielność', text: 'Czy informuję o trudnościach we właściwym momencie — ani za wcześnie, ani za późno?', type: 'scale' },
-      { category: 'Zaangażowanie i inicjatywa', text: 'Czy widzisz, że rozumiem misję Publink i działam w jej duchu?', type: 'scale' },
-      { category: 'Zaangażowanie i inicjatywa', text: 'Czy angażuję się w działania wychodzące poza mój bezpośredni zakres zadań?', type: 'scale' },
-      { category: 'Zaangażowanie i inicjatywa', text: 'Czy proponuję rozwiązania, czy czekam na gotowe?', type: 'scale' },
-      { category: 'Kultura i postawa', text: 'Czy mój sposób komunikacji jest otwarty i zgodny z wartościami Publink?', type: 'scale' },
-      { category: 'Kultura i postawa', text: 'Czy przyjmuję feedback i wyciągam z niego wnioski?', type: 'scale' },
-      { category: 'Kultura i postawa', text: 'Czy buduję relacje zarówno z osobami w biurze, jak i zdalnie?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy rozumiem zakres swojej roli i działam w jej ramach?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy uczę się swojej roli w tempie, które uważasz za właściwe?', type: 'scale' },
-      { category: 'Pytanie otwarte', text: 'Co robię dobrze, czego jeszcze nie widać w wynikach, ale widać w postawie?', type: 'open' },
-      { category: 'Pytanie otwarte', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
+      { category: 'SAMODZIELNOŚĆ', text: 'Czy zauważasz, że działam samodzielnie i szukam rozwiązań zanim poproszę o pomoc?', type: 'scale' },
+      { category: 'SAMODZIELNOŚĆ', text: 'Czy potrafię zaplanować i zorganizować swoją pracę bez potrzeby ustalania każdego kroku z innymi?', type: 'scale' },
+      { category: 'SAMODZIELNOŚĆ', text: 'Czy informuję o trudnościach we właściwym momencie, ani za wcześnie, ani za późno?', type: 'scale' },
+      { category: 'INICJATYWA I PROAKTYWNOŚĆ', text: 'Czy widzisz, że rozumiem misję Publink i działam w jej duchu?', type: 'scale' },
+      { category: 'INICJATYWA I PROAKTYWNOŚĆ', text: 'Czy angażuję się w działania wychodzące poza mój bezpośredni zakres zadań?', type: 'scale' },
+      { category: 'INICJATYWA I PROAKTYWNOŚĆ', text: 'Czy proponuję rozwiązania, czy czekam na gotowe?', type: 'scale' },
+      { category: 'KOMUNIKACJA I FEEDBACK', text: 'Czy mój sposób komunikacji jest otwarty i zgodny z wartościami Publink?', type: 'scale' },
+      { category: 'KOMUNIKACJA I FEEDBACK', text: 'Czy przyjmuję feedback i wyciągam z niego wnioski?', type: 'scale' },
+      { category: 'KULTURA I WARTOŚCI', text: 'Czy buduję relacje zarówno z osobami w biurze, jak i zdalnie?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy rozumiem zakres swojej roli i działam w jej ramach?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy uczę się swojej roli w tempie, które uważasz za właściwe?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Co robię dobrze, czego jeszcze nie widać w wynikach, ale widać w postawie?', type: 'open' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
     ]
   },
   '6msc': {
@@ -905,21 +907,20 @@ const TEMPLATES = {
     name: '6 miesięcy',
     desc: 'Efektywność i wpływ',
     questions: [
-      { category: 'Seniority', text: 'Czy rozumiem kontekst biznesowy Publink i uwzględniam go w swoich decyzjach?', type: 'scale' },
-      { category: 'Seniority', text: 'Czy potrafię samodzielnie priorytetyzować zadania w kontekście celów organizacji?', type: 'scale' },
-      { category: 'Seniority', text: 'Czy moje działania są przewidywalne i konsekwentne — czy możesz na mnie polegać?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy dobrze rozumiem co jest moim ownershipem i biorę za niego pełną odpowiedzialność?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy wyniki mojej pracy są zauważalne i mają realny wpływ na organizację lub zespół?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy moja rola jest realizowana w sposób, który odciąża innych, a nie generuje dodatkową pracę?', type: 'scale' },
-      { category: 'Performance', text: 'Czy inicjatywy, które realizuję, mają jasny cel biznesowy i dowożą realną wartość?', type: 'scale' },
-      { category: 'Performance', text: 'Czy procesy, za które odpowiadam, działają sprawnie i są przejrzyste dla innych?', type: 'scale' },
-      { category: 'Zaangażowanie i inicjatywa', text: 'Czy wychodzę z inicjatywami bez czekania na instrukcję?', type: 'scale' },
-      { category: 'Zaangażowanie i inicjatywa', text: 'Czy aktywnie podnoszę tematy i problemy zanim staną się eskalacją?', type: 'scale' },
-      { category: 'Kultura i wpływ na innych', text: 'Czy moje zachowanie modeluje wartości, które chcemy widzieć w organizacji?', type: 'scale' },
-      { category: 'Kultura i wpływ na innych', text: 'Czy buduję poczucie przynależności wśród osób z różnych lokalizacji?', type: 'scale' },
-      { category: 'Pytanie otwarte', text: 'Gdzie widzisz mój największy potencjał do rozwinięcia w kolejnych 6 miesiącach?', type: 'open' },
-      { category: 'Pytanie otwarte', text: 'Co powinnam robić inaczej lub więcej?', type: 'open' },
-      { category: 'Pytanie otwarte', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
+      { category: 'SENIORITY', text: 'Czy rozumiem kontekst biznesowy Publink i uwzględniam go w swoich decyzjach?', type: 'scale' },
+      { category: 'SENIORITY', text: 'Czy potrafię samodzielnie priorytetyzować zadania w kontekście celów organizacji?', type: 'scale' },
+      { category: 'SENIORITY', text: 'Czy moje działania są przewidywalne i konsekwentne, czy możesz na mnie polegać?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy dobrze rozumiem co jest moim ownershipem i biorę za niego pełną odpowiedzialność?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy wyniki mojej pracy są zauważalne i mają realny wpływ na organizację lub zespół?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy moja rola jest realizowana w sposób, który odciąża innych, a nie generuje dodatkową pracę?', type: 'scale' },
+      { category: 'WPŁYW I OUTCOMES', text: 'Czy inicjatywy, które realizuję, mają jasny cel biznesowy i dowożą realną wartość?', type: 'scale' },
+      { category: 'WPŁYW I OUTCOMES', text: 'Czy procesy, za które odpowiadam, działają sprawnie i są przejrzyste dla innych?', type: 'scale' },
+      { category: 'INICJATYWA I PROAKTYWNOŚĆ', text: 'Czy wychodzę z inicjatywami bez czekania na instrukcję?', type: 'scale' },
+      { category: 'INICJATYWA I PROAKTYWNOŚĆ', text: 'Czy aktywnie podnoszę tematy i problemy zanim staną się eskalacją?', type: 'scale' },
+      { category: 'KULTURA I WARTOŚCI', text: 'Czy moje zachowanie modeluje wartości, które chcemy widzieć w organizacji?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Gdzie widzisz mój największy potencjał do rozwinięcia w kolejnych 6 miesiącach?', type: 'open' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Co powinnam robić inaczej lub więcej?', type: 'open' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
     ]
   },
   '12msc': {
@@ -928,21 +929,20 @@ const TEMPLATES = {
     name: '12 miesięcy',
     desc: 'Strategic impact i seniority',
     questions: [
-      { category: 'Seniority — poziom senior', text: 'Czy wnoszę perspektywę strategiczną do decyzji w swoim obszarze, a nie tylko je egzekutuję?', type: 'scale' },
-      { category: 'Seniority — poziom senior', text: 'Czy biorę odpowiedzialność za złożone procesy i projekty od koncepcji po rozliczenie?', type: 'scale' },
-      { category: 'Seniority — poziom senior', text: 'Czy pełnię rolę mentora lub punktu odniesienia dla innych?', type: 'scale' },
-      { category: 'Seniority — poziom senior', text: 'Czy angażuję się w zmiany organizacyjne i pomagam je kształtować i wyjaśniać innym?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy realizuję swoją rolę na poziomie, który realnie podnosi poprzeczkę dla organizacji?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy mój obszar działa sprawnie i skalowalnie, niezależnie od mojej bezpośredniej obecności?', type: 'scale' },
-      { category: 'Ja w roli', text: 'Czy inni w organizacji postrzegają mnie jako eksperta lub eksperkę w moim obszarze?', type: 'scale' },
-      { category: 'Performance — outcomes', text: 'Czy efekty moich działań są widoczne dla organizacji jako realna zmiana, a nie tylko aktywność?', type: 'scale' },
-      { category: 'Performance — outcomes', text: 'Czy to co realizuję, przekłada się na wartość dla ludzi i organizacji?', type: 'scale' },
-      { category: 'Samodzielność decyzyjna', text: 'Czy podejmuję trudne decyzje samodzielnie i transparentnie je komunikuję?', type: 'scale' },
-      { category: 'Samodzielność decyzyjna', text: 'Czy potrafię obronić swoje decyzje merytorycznie, niezależnie od hierarchii?', type: 'scale' },
-      { category: 'Wpływ na kulturę', text: 'Czy aktywnie buduję kulturę feedbacku w swoim otoczeniu — nie tylko przyjmuję, ale też inicjuję?', type: 'scale' },
-      { category: 'Wpływ na kulturę', text: 'Czy moje działania mają widoczny wpływ na spójność i kulturę organizacji?', type: 'scale' },
-      { category: 'Pytanie otwarte', text: 'Czy jestem osobą, o którą organizacja powinna walczyć, gdybym chciała odejść? Jeśli nie — co musiałoby się zmienić?', type: 'open' },
-      { category: 'Pytanie otwarte', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
+      { category: 'SENIORITY', text: 'Czy wnoszę perspektywę strategiczną do decyzji w swoim obszarze, a nie tylko je egzekutuję?', type: 'scale' },
+      { category: 'SENIORITY', text: 'Czy biorę odpowiedzialność za złożone procesy i projekty od koncepcji po rozliczenie?', type: 'scale' },
+      { category: 'SENIORITY', text: 'Czy pełnię rolę mentora lub punktu odniesienia dla innych?', type: 'scale' },
+      { category: 'SENIORITY', text: 'Czy angażuję się w zmiany organizacyjne i pomagam je kształtować i wyjaśniać innym?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy realizuję swoją rolę na poziomie, który realnie podnosi poprzeczkę dla organizacji?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy mój obszar działa sprawnie i skalowalnie, niezależnie od mojej bezpośredniej obecności?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy uważasz mnie za eksperta lub eksperkę w moim obszarze?', type: 'scale' },
+      { category: 'WPŁYW I OUTCOMES', text: 'Czy efekty moich działań są widoczne dla organizacji jako realna zmiana, a nie tylko aktywność?', type: 'scale' },
+      { category: 'WPŁYW I OUTCOMES', text: 'Czy to co realizuję, przekłada się na wartość dla ludzi i organizacji?', type: 'scale' },
+      { category: 'SAMODZIELNOŚĆ', text: 'Czy podejmuję trudne decyzje samodzielnie i transparentnie je komunikuję?', type: 'scale' },
+      { category: 'SAMODZIELNOŚĆ', text: 'Czy potrafię obronić swoje decyzje merytorycznie?', type: 'scale' },
+      { category: 'KOMUNIKACJA I FEEDBACK', text: 'Czy aktywnie buduję kulturę feedbacku w swoim otoczeniu, nie tylko przyjmuję, ale też inicjuję?', type: 'scale' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Czy jestem osobą, o którą organizacja powinna walczyć, gdybym chciała odejść? Jeśli nie, co musiałoby się zmienić?', type: 'open' },
+      { category: 'JA W SWOJEJ ROLI', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
     ]
   },
   'custom': {
@@ -954,7 +954,7 @@ const TEMPLATES = {
   }
 };
 
-const DEFAULT_QUESTIONS = [
+const DEFAULT_QUESTIONS = [ = [
   { category: 'Performance', text: 'Jak oceniasz jakość pracy tej osoby w ostatnim okresie?', type: 'scale' },
   { category: 'Performance', text: 'Czy ta osoba regularnie dostarcza wyniki na czas?', type: 'scale' },
   { category: 'Performance', text: 'Co możesz wskazać jako największy atut tej osoby w pracy?', type: 'open' },
