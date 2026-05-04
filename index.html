@@ -1506,22 +1506,52 @@ function addCustomQuestion() {
 // Questions Admin
 function loadQuestionsAdmin() {
   const container = document.getElementById('questions-admin-container');
-  const categories = [...new Set(allQuestions.map(q => q.category))];
+
+  // Collect all questions from all templates
+  const allTplQuestions = [];
+  Object.values(TEMPLATES).forEach(tpl => {
+    if (tpl.id === 'custom') return;
+    tpl.questions.forEach(q => allTplQuestions.push({...q, source: tpl.emoji + ' ' + tpl.name}));
+  });
+
+  // Group by category
+  const categories = [...new Set(allTplQuestions.map(q => q.category))];
   let html = '';
+
   categories.forEach(cat => {
+    const qs = allTplQuestions.filter(q => q.category === cat);
     html += `<div class="card" style="margin-bottom:16px">
       <h3 style="margin-bottom:16px;font-size:15px">${cat}</h3>`;
-    allQuestions.filter(q => q.category === cat).forEach(q => {
+    qs.forEach(q => {
       html += `
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <div style="flex:1;font-size:14px">${q.text}</div>
+          <div style="flex:1">
+            <div style="font-size:14px;margin-bottom:3px">${q.text}</div>
+            <span style="font-size:11px;color:var(--text3)">${q.source}</span>
+          </div>
           <div class="badge badge-purple">${typeLabel(q.type)}</div>
-          ${q.id.startsWith('custom_') || !q.id.startsWith('default_') ? `<button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>` : ''}
         </div>`;
     });
     html += `</div>`;
   });
-  container.innerHTML = html;
+
+  // Custom questions added by user
+  const customQs = allQuestions.filter(q => q.id.startsWith('admin_') || q.id.startsWith('custom_'));
+  if (customQs.length > 0) {
+    html += `<div class="card" style="margin-bottom:16px">
+      <h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
+    customQs.forEach(q => {
+      html += `
+        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+          <div style="flex:1;font-size:14px">${q.text}</div>
+          <div class="badge badge-purple">${typeLabel(q.type)}</div>
+          <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  container.innerHTML = html || '<p style="color:var(--text2);padding:20px">Brak pytań w bazie.</p>';
 }
 
 function openAddQuestionModal() {
