@@ -217,6 +217,17 @@
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 24px;
     }
+    .template-card {
+      background: var(--bg3); border: 2px solid var(--border);
+      border-radius: var(--radius); padding: 18px; cursor: pointer;
+      transition: all 0.2s; text-align: center;
+    }
+    .template-card:hover { border-color: var(--accent); background: rgba(124,92,252,0.06); }
+    .template-card.selected { border-color: var(--accent); background: rgba(124,92,252,0.1); }
+    .template-emoji { font-size: 28px; margin-bottom: 8px; }
+    .template-name { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .template-desc { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+    .template-count { font-size: 11px; color: var(--text3); background: var(--bg4); padding: 2px 8px; border-radius: 10px; display: inline-block; }
     .card + .card { margin-top: 16px; }
 
     /* ─── FEEDBACK ROUNDS LIST ─── */
@@ -667,22 +678,50 @@
             </div>
           </div>
 
-          <!-- Step 2: Questions -->
+          <!-- Step 2: Template selector -->
           <div class="card" style="margin-bottom:16px">
             <div class="form-section">
-              <div class="flex justify-between items-center mb-3">
-                <h3 style="margin-bottom:0">Pytania</h3>
-                <button class="btn btn-secondary" style="font-size:13px;padding:8px 14px" onclick="openCustomQuestionModal()">+ Własne pytanie</button>
-              </div>
-              <p class="text-sm text-muted" style="margin-bottom:14px">Wybierz z bazy lub dodaj własne pytania</p>
-
-              <div class="question-bank" id="question-bank">
-                <!-- populated by JS -->
+              <h3>Wybierz szablon</h3>
+              <p class="text-sm text-muted" style="margin-bottom:16px">Zacznij od gotowego szablonu lub stwórz własny</p>
+              <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px" id="template-grid">
+                <div class="template-card" onclick="selectTemplate('3msc')" id="tpl-3msc">
+                  <div class="template-emoji">👶</div>
+                  <div class="template-name">3 miesiące</div>
+                  <div class="template-desc">Orientacja i pierwsze wrażenie</div>
+                  <div class="template-count" id="tpl-count-3msc">13 pytań</div>
+                </div>
+                <div class="template-card" onclick="selectTemplate('6msc')" id="tpl-6msc">
+                  <div class="template-emoji">🧑</div>
+                  <div class="template-name">6 miesięcy</div>
+                  <div class="template-desc">Efektywność i wpływ</div>
+                  <div class="template-count" id="tpl-count-6msc">15 pytań</div>
+                </div>
+                <div class="template-card" onclick="selectTemplate('12msc')" id="tpl-12msc">
+                  <div class="template-emoji">🧓</div>
+                  <div class="template-name">12 miesięcy</div>
+                  <div class="template-desc">Strategic impact i seniority</div>
+                  <div class="template-count" id="tpl-count-12msc">15 pytań</div>
+                </div>
+                <div class="template-card" onclick="selectTemplate('custom')" id="tpl-custom">
+                  <div class="template-emoji">✏️</div>
+                  <div class="template-name">Własny szablon</div>
+                  <div class="template-desc">Stwórz od zera lub z bazy</div>
+                  <div class="template-count">0 pytań</div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div id="selected-questions-area" style="display:none">
-              <h3 style="margin-bottom:12px; font-size:14px; color:var(--text2)">Wybrane pytania (<span id="selected-count">0</span>)</h3>
+          <!-- Step 3: Questions editor (shown after template selection) -->
+          <div class="card" style="margin-bottom:16px;display:none" id="questions-editor">
+            <div class="form-section">
+              <div class="flex justify-between items-center mb-3">
+                <h3 style="margin-bottom:0">Pytania <span id="selected-template-name" style="color:var(--text2);font-weight:400;font-size:13px"></span></h3>
+                <div class="flex gap-2">
+                  <button class="btn btn-secondary" style="font-size:13px;padding:8px 14px" onclick="openAddFromBankModal()">+ Z bazy</button>
+                  <button class="btn btn-secondary" style="font-size:13px;padding:8px 14px" onclick="openCustomQuestionModal()">+ Własne</button>
+                </div>
+              </div>
               <div class="selected-questions" id="selected-questions-list"></div>
             </div>
           </div>
@@ -737,6 +776,17 @@
 <!-- ═══════════════════════════════════════════
      MODALS
 ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-add-from-bank">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Dodaj pytanie z bazy</h2>
+      <button class="modal-close" onclick="closeModal('modal-add-from-bank')">×</button>
+    </div>
+    <div class="question-bank" id="bank-modal-list" style="max-height:400px"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="closeModal('modal-add-from-bank')">Gotowe</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal-custom-question">
   <div class="modal">
     <div class="modal-header">
@@ -815,20 +865,96 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 // ═══════════════════════════════════════════
 // DEFAULT QUESTION BANK (Publink values)
 // ═══════════════════════════════════════════
+// ═══════════════════════════════════════════
+// SZABLONY PYTAŃ
+// ═══════════════════════════════════════════
+const TEMPLATES = {
+  '3msc': {
+    id: '3msc',
+    emoji: '👶',
+    name: '3 miesiące',
+    desc: 'Orientacja i pierwsze wrażenie',
+    questions: [
+      { category: 'Seniority i samodzielność', text: 'Czy zauważasz, że działam samodzielnie — szukam rozwiązań zanim poproszę o pomoc?', type: 'scale' },
+      { category: 'Seniority i samodzielność', text: 'Czy potrafię zaplanować i zorganizować swoją pracę bez potrzeby ustalania każdego kroku z innymi?', type: 'scale' },
+      { category: 'Seniority i samodzielność', text: 'Czy informuję o trudnościach we właściwym momencie — ani za wcześnie, ani za późno?', type: 'scale' },
+      { category: 'Zaangażowanie i inicjatywa', text: 'Czy widzisz, że rozumiem misję Publink i działam w jej duchu?', type: 'scale' },
+      { category: 'Zaangażowanie i inicjatywa', text: 'Czy angażuję się w działania wychodzące poza mój bezpośredni zakres zadań?', type: 'scale' },
+      { category: 'Zaangażowanie i inicjatywa', text: 'Czy proponuję rozwiązania, czy czekam na gotowe?', type: 'scale' },
+      { category: 'Kultura i postawa', text: 'Czy mój sposób komunikacji jest otwarty i zgodny z wartościami Publink?', type: 'scale' },
+      { category: 'Kultura i postawa', text: 'Czy przyjmuję feedback i wyciągam z niego wnioski?', type: 'scale' },
+      { category: 'Kultura i postawa', text: 'Czy buduję relacje zarówno z osobami w biurze, jak i zdalnie?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy rozumiem zakres swojej roli i działam w jej ramach?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy uczę się swojej roli w tempie, które uważasz za właściwe?', type: 'scale' },
+      { category: 'Pytanie otwarte', text: 'Co robię dobrze, czego jeszcze nie widać w wynikach, ale widać w postawie?', type: 'open' },
+      { category: 'Pytanie otwarte', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
+    ]
+  },
+  '6msc': {
+    id: '6msc',
+    emoji: '🧑',
+    name: '6 miesięcy',
+    desc: 'Efektywność i wpływ',
+    questions: [
+      { category: 'Seniority', text: 'Czy rozumiem kontekst biznesowy Publink i uwzględniam go w swoich decyzjach?', type: 'scale' },
+      { category: 'Seniority', text: 'Czy potrafię samodzielnie priorytetyzować zadania w kontekście celów organizacji?', type: 'scale' },
+      { category: 'Seniority', text: 'Czy moje działania są przewidywalne i konsekwentne — czy możesz na mnie polegać?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy dobrze rozumiem co jest moim ownershipem i biorę za niego pełną odpowiedzialność?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy wyniki mojej pracy są zauważalne i mają realny wpływ na organizację lub zespół?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy moja rola jest realizowana w sposób, który odciąża innych, a nie generuje dodatkową pracę?', type: 'scale' },
+      { category: 'Performance', text: 'Czy inicjatywy, które realizuję, mają jasny cel biznesowy i dowożą realną wartość?', type: 'scale' },
+      { category: 'Performance', text: 'Czy procesy, za które odpowiadam, działają sprawnie i są przejrzyste dla innych?', type: 'scale' },
+      { category: 'Zaangażowanie i inicjatywa', text: 'Czy wychodzę z inicjatywami bez czekania na instrukcję?', type: 'scale' },
+      { category: 'Zaangażowanie i inicjatywa', text: 'Czy aktywnie podnoszę tematy i problemy zanim staną się eskalacją?', type: 'scale' },
+      { category: 'Kultura i wpływ na innych', text: 'Czy moje zachowanie modeluje wartości, które chcemy widzieć w organizacji?', type: 'scale' },
+      { category: 'Kultura i wpływ na innych', text: 'Czy buduję poczucie przynależności wśród osób z różnych lokalizacji?', type: 'scale' },
+      { category: 'Pytanie otwarte', text: 'Gdzie widzisz mój największy potencjał do rozwinięcia w kolejnych 6 miesiącach?', type: 'open' },
+      { category: 'Pytanie otwarte', text: 'Co powinnam robić inaczej lub więcej?', type: 'open' },
+      { category: 'Pytanie otwarte', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
+    ]
+  },
+  '12msc': {
+    id: '12msc',
+    emoji: '🧓',
+    name: '12 miesięcy',
+    desc: 'Strategic impact i seniority',
+    questions: [
+      { category: 'Seniority — poziom senior', text: 'Czy wnoszę perspektywę strategiczną do decyzji w swoim obszarze, a nie tylko je egzekutuję?', type: 'scale' },
+      { category: 'Seniority — poziom senior', text: 'Czy biorę odpowiedzialność za złożone procesy i projekty od koncepcji po rozliczenie?', type: 'scale' },
+      { category: 'Seniority — poziom senior', text: 'Czy pełnię rolę mentora lub punktu odniesienia dla innych?', type: 'scale' },
+      { category: 'Seniority — poziom senior', text: 'Czy angażuję się w zmiany organizacyjne i pomagam je kształtować i wyjaśniać innym?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy realizuję swoją rolę na poziomie, który realnie podnosi poprzeczkę dla organizacji?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy mój obszar działa sprawnie i skalowalnie, niezależnie od mojej bezpośredniej obecności?', type: 'scale' },
+      { category: 'Ja w roli', text: 'Czy inni w organizacji postrzegają mnie jako eksperta lub eksperkę w moim obszarze?', type: 'scale' },
+      { category: 'Performance — outcomes', text: 'Czy efekty moich działań są widoczne dla organizacji jako realna zmiana, a nie tylko aktywność?', type: 'scale' },
+      { category: 'Performance — outcomes', text: 'Czy to co realizuję, przekłada się na wartość dla ludzi i organizacji?', type: 'scale' },
+      { category: 'Samodzielność decyzyjna', text: 'Czy podejmuję trudne decyzje samodzielnie i transparentnie je komunikuję?', type: 'scale' },
+      { category: 'Samodzielność decyzyjna', text: 'Czy potrafię obronić swoje decyzje merytorycznie, niezależnie od hierarchii?', type: 'scale' },
+      { category: 'Wpływ na kulturę', text: 'Czy aktywnie buduję kulturę feedbacku w swoim otoczeniu — nie tylko przyjmuję, ale też inicjuję?', type: 'scale' },
+      { category: 'Wpływ na kulturę', text: 'Czy moje działania mają widoczny wpływ na spójność i kulturę organizacji?', type: 'scale' },
+      { category: 'Pytanie otwarte', text: 'Czy jestem osobą, o którą organizacja powinna walczyć, gdybym chciała odejść? Jeśli nie — co musiałoby się zmienić?', type: 'open' },
+      { category: 'Pytanie otwarte', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
+    ]
+  },
+  'custom': {
+    id: 'custom',
+    emoji: '✏️',
+    name: 'Własny szablon',
+    desc: 'Stwórz od zera lub wybierz z bazy',
+    questions: []
+  }
+};
+
 const DEFAULT_QUESTIONS = [
-  // Performance
   { category: 'Performance', text: 'Jak oceniasz jakość pracy tej osoby w ostatnim okresie?', type: 'scale' },
   { category: 'Performance', text: 'Czy ta osoba regularnie dostarcza wyniki na czas?', type: 'scale' },
   { category: 'Performance', text: 'Co możesz wskazać jako największy atut tej osoby w pracy?', type: 'open' },
-  // Seniority & Samodzielność
   { category: 'Seniority', text: 'Jak oceniasz samodzielność tej osoby w realizacji zadań?', type: 'scale' },
   { category: 'Seniority', text: 'Czy ta osoba podejmuje decyzje w odpowiedniej skali do swojego poziomu?', type: 'scale' },
   { category: 'Seniority', text: 'Jak oceniasz poziom ekspertyzy technicznej / merytorycznej tej osoby?', type: 'scale' },
-  // Proaktywność
   { category: 'Zaangażowanie', text: 'Jak oceniasz proaktywność tej osoby — czy wychodzi z inicjatywą?', type: 'scale' },
   { category: 'Zaangażowanie', text: 'Czy ta osoba angażuje się w projekty i tematy poza swoim zakresem obowiązków?', type: 'closed' },
   { category: 'Zaangażowanie', text: 'Opisz sytuację, w której ta osoba wykazała się wyjątkowym zaangażowaniem.', type: 'open' },
-  // Kultura
   { category: 'Kultura', text: 'Jak oceniasz kulturę feedbacku tej osoby — czy daje i przyjmuje feedback konstruktywnie?', type: 'scale' },
   { category: 'Kultura', text: 'Czy ta osoba działa zgodnie z wartościami Publink?', type: 'closed' },
   { category: 'Kultura', text: 'Co poradziłbyś/abyś tej osobie, żeby się rozwijała?', type: 'open' },
@@ -1229,10 +1355,29 @@ function copyLink(url) {
 // ═══════════════════════════════════════════
 // QUESTION BANK
 // ═══════════════════════════════════════════
+let selectedTemplateId = null;
+
+function selectTemplate(tplId) {
+  selectedTemplateId = tplId;
+  // Update UI
+  document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('tpl-' + tplId).classList.add('selected');
+
+  const tpl = TEMPLATES[tplId];
+  // Load questions from template
+  selectedQuestions = tpl.questions.map((q, i) => ({...q, id: tplId + '_' + i}));
+
+  // Show editor
+  const editor = document.getElementById('questions-editor');
+  editor.style.display = 'block';
+  document.getElementById('selected-template-name').textContent = '— ' + tpl.emoji + ' ' + tpl.name;
+  renderSelectedQuestions();
+}
+
 function renderQuestionBank() {
+  // Legacy — not used in new flow but keep for bank admin
   const container = document.getElementById('question-bank');
   if (!container) return;
-
   const categories = [...new Set(allQuestions.map(q => q.category))];
   let html = '';
   categories.forEach(cat => {
@@ -1248,6 +1393,40 @@ function renderQuestionBank() {
     });
   });
   container.innerHTML = html;
+}
+
+function openAddFromBankModal() {
+  const container = document.getElementById('bank-modal-list');
+  const categories = [...new Set(allQuestions.map(q => q.category))];
+  let html = '';
+  categories.forEach(cat => {
+    html += `<div class="qbank-category">${cat}</div>`;
+    allQuestions.filter(q => q.category === cat).forEach(q => {
+      const sel = selectedQuestions.find(s => s.id === q.id);
+      html += `
+        <div class="qbank-item${sel ? ' selected' : ''}" onclick="toggleBankQuestion('${q.id}')">
+          <div class="qbank-checkbox"></div>
+          <div class="qbank-text">${q.text}</div>
+          <div class="qbank-type">${typeLabel(q.type)}</div>
+        </div>`;
+    });
+  });
+  container.innerHTML = html;
+  openModal('modal-add-from-bank');
+}
+
+function toggleBankQuestion(qId) {
+  const q = allQuestions.find(q => q.id === qId);
+  if (!q) return;
+  const idx = selectedQuestions.findIndex(s => s.id === qId);
+  if (idx !== -1) {
+    selectedQuestions.splice(idx, 1);
+  } else {
+    selectedQuestions.push({...q});
+  }
+  // Refresh bank modal
+  openAddFromBankModal();
+  renderSelectedQuestions();
 }
 
 function typeLabel(type) {
@@ -1268,23 +1447,22 @@ function toggleQuestion(qId) {
 }
 
 function renderSelectedQuestions() {
-  const area = document.getElementById('selected-questions-area');
   const list = document.getElementById('selected-questions-list');
-  const count = document.getElementById('selected-count');
-  if (!area) return;
+  if (!list) return;
 
   if (selectedQuestions.length === 0) {
-    area.style.display = 'none';
+    list.innerHTML = '<p style="color:var(--text3);font-size:14px;text-align:center;padding:20px">Brak pytań — dodaj z szablonu, bazy lub własne</p>';
     return;
   }
-  area.style.display = 'block';
-  count.textContent = selectedQuestions.length;
   list.innerHTML = selectedQuestions.map((q, i) => `
     <div class="sq-item">
       <div class="sq-drag">⠿</div>
       <div class="sq-content">
         <div class="sq-text">${q.text}</div>
-        <div class="sq-type">${typeLabel(q.type)}</div>
+        <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
+          <div class="sq-type">${typeLabel(q.type)}</div>
+          <span style="font-size:11px;color:var(--text3)">${q.category || ''}</span>
+        </div>
       </div>
       <div class="sq-remove" onclick="removeSelectedQuestion(${i})">×</div>
     </div>`).join('');
@@ -1562,7 +1740,14 @@ function showView(name) {
   const navEl = document.getElementById('nav-' + name);
   if (navEl) navEl.classList.add('active');
 
-  if (name === 'new') { renderQuestionBank(); renderSelectedQuestions(); }
+  if (name === 'new') {
+    selectedQuestions = [];
+    selectedTemplateId = null;
+    document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+    const editor = document.getElementById('questions-editor');
+    if (editor) editor.style.display = 'none';
+    renderSelectedQuestions();
+  }
   if (name === 'questions') loadQuestionsAdmin();
   if (name === 'rounds') loadRounds();
 }
