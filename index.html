@@ -793,8 +793,8 @@
 // ═══════════════════════════════════════════
 // CONFIG — WKLEJ SWOJE KLUCZE
 // ═══════════════════════════════════════════
-const SUPABASE_URL = 'https://hyqttnjvycnfafcdrkli.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_pU-gbxhKqbgXpKH-vVNqfw_Sg5QRMPR';
+const SUPABASE_URL = 'TWOJ_SUPABASE_URL';
+const SUPABASE_KEY = 'TWOJ_PUBLISHABLE_KEY';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -836,10 +836,20 @@ let feedbackAnonymous = false;
 // ═══════════════════════════════════════════
 async function init() {
   const hash = window.location.hash;
+  const urlParams = new URLSearchParams(window.location.search);
+  const feedbackParam = urlParams.get('feedback');
+
+  // Public feedback form — no login required
   if (hash.startsWith('#feedback/')) {
     const roundId = hash.replace('#feedback/', '');
     showPage('feedback');
     await loadFeedbackForm(roundId);
+    return;
+  }
+
+  if (feedbackParam) {
+    showPage('feedback');
+    await loadFeedbackForm(feedbackParam);
     return;
   }
 
@@ -1030,7 +1040,7 @@ function showRoundDetail(roundId) {
 
   const responses = getResponses(roundId);
   const isOpen = round.status === 'open';
-  const feedbackUrl = `${window.location.origin}${window.location.pathname}#feedback/${roundId}`;
+  const feedbackUrl = `${window.location.origin}${window.location.pathname}?feedback=${roundId}`;
 
   document.getElementById('detail-title').textContent = round.name;
   document.getElementById('detail-subtitle').textContent = `${responses.length} odpowiedzi · ${round.questions.length} pytań`;
