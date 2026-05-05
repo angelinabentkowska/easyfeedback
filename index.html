@@ -960,7 +960,7 @@ const DEFAULT_QUESTIONS = [];
 // STATE
 // ═══════════════════════════════════════════
 let currentUser = null;
-let allQuestions = [...DEFAULT_QUESTIONS.map((q,i) => ({...q, id: 'default_'+i}))];
+let allQuestions = Object.values(TEMPLATES).filter(t => t.id !== 'custom').flatMap((t,ti) => t.questions.map((q,i) => ({...q, id: t.id+'_'+i})));
 let selectedQuestions = [];
 let currentRoundId = null;
 let feedbackAnswers = {};
