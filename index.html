@@ -177,7 +177,7 @@
     .nav-item:hover { background: var(--bg3); color: var(--text); }
     .nav-item.active { background: var(--bg3); color: var(--accent2); border-left-color: var(--accent2); }
     .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-    .sidebar-bottom { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+    .sidebar-bottom { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); text-align: center; }
     .user-pill {
       display: flex; align-items: center; gap: 10px;
       padding: 8px 10px; border-radius: var(--radius-sm);
@@ -191,11 +191,12 @@
     }
     .user-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .theme-toggle {
-      display: flex; align-items: center; gap: 8px; margin-top: 10px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;
       padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer;
       color: var(--text2); font-size: 13px;
     }
     .theme-toggle:hover { background: var(--bg3); color: var(--text); }
+    .theme-toggle-label { display: flex; align-items: center; gap: 8px; }
 
     /* ─── MAIN CONTENT ─── */
     .main { flex: 1; overflow-y: auto; }
@@ -612,8 +613,11 @@
 
     <div class="sidebar-bottom">
       <div class="theme-toggle" onclick="toggleTheme()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="theme-icon"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        <span id="theme-label">Jasny motyw</span>
+        <div class="theme-toggle-label">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="theme-icon"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span id="theme-label">Jasny motyw</span>
+        </div>
+        <div class="toggle" id="theme-switch"></div>
       </div>
       <div class="user-pill" id="user-pill">
         <div class="user-avatar" id="user-avatar">?</div>
@@ -671,7 +675,7 @@
               <h3>Ustawienia prywatności</h3>
               <div class="toggle-row">
                 <div class="toggle-info">
-                  <h4>Anonimowe odpowiedzi</h4>
+                  <h4>Pozwalaj na udzielanie feedbacku anonimowo</h4>
                   <p>Respondenci mogą wybrać czy podpisać swoją odpowiedź</p>
                 </div>
                 <div class="toggle on" id="toggle-anon" onclick="this.classList.toggle('on')"></div>
@@ -740,12 +744,14 @@
       <div class="main-header">
         <div>
           <h1 class="main-title">Baza pytań</h1>
-          <p class="main-subtitle">Zarządzaj pulą pytań dostępnych dla wszystkich</p>
+          <p class="main-subtitle">Domyślne pytania Publink + Twoje własne</p>
         </div>
         <button class="btn btn-primary" onclick="openAddQuestionModal()">+ Dodaj pytanie</button>
       </div>
-      <div class="content-area" id="questions-admin-container">
-        <div class="loading-screen"><div class="spinner"></div></div>
+      <div class="content-area">
+        <div id="questions-admin-container">
+          <div class="loading-screen"><div class="spinner"></div></div>
+        </div>
       </div>
     </div>
 
@@ -1012,6 +1018,20 @@ async function enterApp() {
   const name = currentUser.user_metadata?.full_name || currentUser.email.split('@')[0];
   document.getElementById('user-name').textContent = name;
   document.getElementById('user-avatar').textContent = name[0].toUpperCase();
+  syncThemeToggle();
+
+  // Load user's custom questions from Supabase into allQuestions
+  const { data: userQs } = await sb
+    .from('questions')
+    .select('*')
+    .eq('user_id', currentUser.id);
+  const existingIds = new Set(allQuestions.map(q => q.id));
+  (userQs || []).forEach(q => {
+    if (!existingIds.has(q.id)) {
+      allQuestions.push({ id: q.id, text: q.text, category: q.category, type: q.type });
+    }
+  });
+
   await loadRounds();
   renderQuestionBank();
 }
@@ -1090,9 +1110,14 @@ async function loadRounds() {
   const { data: rounds, error } = await sb
     .from('rounds')
     .select('*')
+    .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false });
 
-  if (error) { showToast('Błąd ładowania rund', 'error'); return; }
+  if (error) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${error.message}</p></div>`;
+    showToast('Błąd ładowania rund', 'error');
+    return;
+  }
 
   if (!rounds || rounds.length === 0) {
     container.innerHTML = `
@@ -1105,7 +1130,10 @@ async function loadRounds() {
     return;
   }
 
-  const { data: respData } = await sb.from('responses').select('round_id');
+  const roundIds = rounds.map(r => r.id);
+  const { data: respData } = roundIds.length
+    ? await sb.from('responses').select('round_id').in('round_id', roundIds)
+    : { data: [] };
   const countMap = {};
   (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
 
@@ -1116,7 +1144,7 @@ function renderRoundCard(round, responseCount = 0) {
   const isOpen = round.status === 'open';
   const date = new Date(round.created_at).toLocaleDateString('pl-PL', {day:'numeric',month:'long',year:'numeric'});
   return `
-    <div class="round-card" onclick="showRoundDetail('${round.id}')">
+    <div class="round-card" data-id="${round.id}" onclick="showRoundDetail('${round.id}')">
       <button class="round-delete" onclick="event.stopPropagation();confirmDeleteRound('${round.id}','${round.name.replace(/'/g,"\\'")}')">×</button>
       <div class="round-status ${isOpen ? 'open' : 'closed'}">${isOpen ? 'Aktywna' : 'Zamknięta'}</div>
       <div class="round-title">${round.name}</div>
@@ -1136,10 +1164,26 @@ function confirmDeleteRound(roundId, roundName) {
 }
 
 async function deleteRound(roundId) {
+  // Immediately remove card from DOM for instant feedback
+  const card = document.querySelector(`.round-card[data-id="${roundId}"]`);
+  if (card) {
+    card.style.transition = 'opacity 0.2s, transform 0.2s';
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.95)';
+    setTimeout(() => card.remove(), 200);
+  }
+
   const { error } = await sb.from('rounds').delete().eq('id', roundId);
-  if (error) { showToast('Błąd usuwania rundy', 'error'); return; }
-  showToast('Runda usunięta', 'success');
-  await loadRounds();
+  if (error) {
+    showToast('Błąd usuwania rundy', 'error');
+    await loadRounds(); // restore if failed
+    return;
+  }
+  showToast('Twoja runda została usunięta', 'success');
+
+  // If grid is now empty, reload to show empty state
+  const grid = document.querySelector('.rounds-grid');
+  if (grid && grid.children.length === 0) await loadRounds();
 }
 
 async function createRound() {
@@ -1491,20 +1535,39 @@ function addCustomQuestion() {
 }
 
 // Questions Admin
-function loadQuestionsAdmin() {
+async function loadQuestionsAdmin() {
   const container = document.getElementById('questions-admin-container');
+  container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  // Collect all questions from all templates
+  // Load user's custom questions from Supabase
+  const { data: userQs, error } = await sb
+    .from('questions')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    container.innerHTML = `<p style="color:var(--red);padding:20px">Błąd ładowania pytań: ${error.message}</p>`;
+    return;
+  }
+
+  // Merge user questions into allQuestions (available for round creation)
+  const existingIds = new Set(allQuestions.map(q => q.id));
+  (userQs || []).forEach(q => {
+    if (!existingIds.has(q.id)) {
+      allQuestions.push({ id: q.id, text: q.text, category: q.category, type: q.type });
+    }
+  });
+
+  // Render built-in template questions
   const allTplQuestions = [];
   Object.values(TEMPLATES).forEach(tpl => {
     if (tpl.id === 'custom') return;
     tpl.questions.forEach(q => allTplQuestions.push({...q, source: tpl.emoji + ' ' + tpl.name}));
   });
-
-  // Group by category
   const categories = [...new Set(allTplQuestions.map(q => q.category))];
-  let html = '';
 
+  let html = '';
   categories.forEach(cat => {
     const qs = allTplQuestions.filter(q => q.category === cat);
     html += `<div class="card" style="margin-bottom:16px">
@@ -1522,15 +1585,17 @@ function loadQuestionsAdmin() {
     html += `</div>`;
   });
 
-  // Custom questions added by user
-  const customQs = allQuestions.filter(q => q.id.startsWith('admin_') || q.id.startsWith('custom_'));
-  if (customQs.length > 0) {
+  // User's own questions from Supabase
+  if (userQs && userQs.length > 0) {
     html += `<div class="card" style="margin-bottom:16px">
       <h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
-    customQs.forEach(q => {
+    userQs.forEach(q => {
       html += `
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <div style="flex:1;font-size:14px">${q.text}</div>
+          <div style="flex:1">
+            <div style="font-size:14px;margin-bottom:3px">${q.text}</div>
+            <span style="font-size:11px;color:var(--text3)">${q.category}</span>
+          </div>
           <div class="badge badge-purple">${typeLabel(q.type)}</div>
           <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>
         </div>`;
@@ -1545,23 +1610,39 @@ function openAddQuestionModal() {
   openModal('modal-add-question');
 }
 
-function saveQuestionToBank() {
+async function saveQuestionToBank() {
   const text = document.getElementById('aq-text').value.trim();
   const category = document.getElementById('aq-category').value;
   const type = document.getElementById('aq-type').value;
   if (!text) { showToast('Wpisz treść pytania', 'error'); return; }
 
-  const q = { id: 'admin_' + Date.now(), text, category, type };
-  allQuestions.push(q);
+  const btn = document.querySelector('#modal-add-question .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Zapisywanie...'; }
+
+  const { data, error } = await sb.from('questions').insert({
+    text, category, type,
+    user_id: currentUser.id
+  }).select().single();
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Zapisz pytanie'; }
+
+  if (error) { showToast('Błąd zapisu: ' + error.message, 'error'); return; }
+
+  // Add to allQuestions for immediate availability in round creation
+  allQuestions.push({ id: data.id, text: data.text, category: data.category, type: data.type });
+
   closeModal('modal-add-question');
   document.getElementById('aq-text').value = '';
-  loadQuestionsAdmin();
-  showToast('Pytanie dodane do bazy ✓', 'success');
+  await loadQuestionsAdmin();
+  showToast('Pytanie dodane do Twojej bazy ✓', 'success');
 }
 
-function deleteQuestion(qId) {
+async function deleteQuestion(qId) {
+  const { error } = await sb.from('questions').delete().eq('id', qId).eq('user_id', currentUser.id);
+  if (error) { showToast('Błąd usuwania: ' + error.message, 'error'); return; }
+
   allQuestions = allQuestions.filter(q => q.id !== qId);
-  loadQuestionsAdmin();
+  await loadQuestionsAdmin();
   showToast('Pytanie usunięte', 'success');
 }
 
@@ -1609,7 +1690,12 @@ async function saveResponse(roundId, response) {
     respondent_name: response.respondent_name,
     answers: response.answers
   });
-  if (error) console.error('Error saving response:', error);
+  if (error) {
+    console.error('Error saving response:', error);
+    showToast('Błąd wysyłania odpowiedzi: ' + error.message, 'error');
+    return false;
+  }
+  return true;
 }
 
 let fbRound = null;
@@ -1676,11 +1762,19 @@ async function renderFeedbackFormStep(round, step) {
       </div>`;
 
     // Save to Supabase
-    await saveResponse(round.id, {
+    const ok = await saveResponse(round.id, {
       anonymous: fbAnon,
       respondent_name: fbAnon ? null : fbName,
       answers: fbAnswers
     });
+    if (!ok) {
+      card.innerHTML = `
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:56px;margin-bottom:20px">😕</div>
+          <h1 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:12px">Coś poszło nie tak</h1>
+          <p style="color:var(--text2);font-size:15px">Nie udało się zapisać Twojego feedbacku. Spróbuj odświeżyć stronę i wypełnić formularz ponownie.</p>
+        </div>`;
+    }
     return;
   }
 
@@ -1797,8 +1891,16 @@ function showToast(msg, type='success') {
 function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  const newTheme = isDark ? 'light' : 'dark';
+  html.setAttribute('data-theme', newTheme);
   document.getElementById('theme-label').textContent = isDark ? 'Ciemny motyw' : 'Jasny motyw';
+  document.getElementById('theme-switch').classList.toggle('on', !isDark);
+}
+
+function syncThemeToggle() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('theme-label').textContent = isDark ? 'Jasny motyw' : 'Ciemny motyw';
+  document.getElementById('theme-switch').classList.toggle('on', !isDark);
 }
 
 // Close modals on overlay click
