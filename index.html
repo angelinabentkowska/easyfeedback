@@ -639,9 +639,7 @@
         <button class="btn btn-primary" onclick="showView('new')">+ Nowa runda</button>
       </div>
       <div class="content-area">
-        <div id="rounds-container">
-          <div class="loading-screen"><div class="spinner"></div></div>
-        </div>
+        <div id="rounds-container"></div>
       </div>
     </div>
 
@@ -676,7 +674,6 @@
               <div class="toggle-row">
                 <div class="toggle-info">
                   <h4>Pozwalaj na udzielanie feedbacku anonimowo</h4>
-                  <p>Respondenci mogą wybrać czy podpisać swoją odpowiedź</p>
                 </div>
                 <div class="toggle on" id="toggle-anon" onclick="this.classList.toggle('on')"></div>
               </div>
@@ -1107,37 +1104,53 @@ async function loadRounds() {
   const container = document.getElementById('rounds-container');
   container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  const { data: rounds, error } = await sb
-    .from('rounds')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false });
+  // Safety net — jeśli coś się zawiesi, po 8s pokaż błąd zamiast kręcić wiecznie
+  const timeout = setTimeout(() => {
+    if (container.querySelector('.spinner')) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏱️</div><h2 class="empty-title">Ładowanie trwa zbyt długo</h2><p class="empty-desc">Sprawdź połączenie z internetem i odśwież stronę.</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
+    }
+  }, 8000);
 
-  if (error) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${error.message}</p></div>`;
-    showToast('Błąd ładowania rund', 'error');
-    return;
+  try {
+    const { data: rounds, error } = await sb
+      .from('rounds')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false });
+
+    clearTimeout(timeout);
+
+    if (error) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${error.message}</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
+      showToast('Błąd ładowania rund', 'error');
+      return;
+    }
+
+    if (!rounds || rounds.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📬</div>
+          <h2 class="empty-title">Brak rund feedbacku</h2>
+          <p class="empty-desc">Stwórz swoją pierwszą rundę i zbieraj feedback od zespołu</p>
+          <button class="btn btn-primary" onclick="showView('new')">Stwórz pierwszą rundę</button>
+        </div>`;
+      return;
+    }
+
+    const roundIds = rounds.map(r => r.id);
+    const { data: respData } = roundIds.length
+      ? await sb.from('responses').select('round_id').in('round_id', roundIds)
+      : { data: [] };
+    const countMap = {};
+    (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
+
+    container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
+
+  } catch (err) {
+    clearTimeout(timeout);
+    console.error('loadRounds error:', err);
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${err.message || 'Nieznany błąd'}</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
   }
-
-  if (!rounds || rounds.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📬</div>
-        <h2 class="empty-title">Brak rund feedbacku</h2>
-        <p class="empty-desc">Stwórz swoją pierwszą rundę i zbieraj feedback od zespołu</p>
-        <button class="btn btn-primary" onclick="showView('new')">Stwórz pierwszą rundę</button>
-      </div>`;
-    return;
-  }
-
-  const roundIds = rounds.map(r => r.id);
-  const { data: respData } = roundIds.length
-    ? await sb.from('responses').select('round_id').in('round_id', roundIds)
-    : { data: [] };
-  const countMap = {};
-  (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
-
-  container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
 }
 
 function renderRoundCard(round, responseCount = 0) {
@@ -1680,7 +1693,46 @@ async function loadFeedbackForm(roundId) {
     return;
   }
 
+  if (hasAlreadySubmitted(round.id)) {
+    card.innerHTML = `
+      <div style="text-align:center;padding:40px">
+        <div style="font-size:48px;margin-bottom:16px">✅</div>
+        <h2 style="font-family:'Syne',sans-serif;margin-bottom:8px">Już wypełniłeś ten formularz</h2>
+        <p style="color:var(--text2)">Twój feedback dla tej rundy został już zapisany. Dziękujemy!</p>
+      </div>`;
+    return;
+  }
+
   renderFeedbackFormStep(round, 0);
+}
+
+// ═══════════════════════════════════════════
+// RATE LIMITING (localStorage — jedna odpowiedź na rundę per przeglądarka)
+// ═══════════════════════════════════════════
+const FEEDBACK_STORAGE_KEY = 'ef_submitted_rounds';
+const FEEDBACK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h cooldown
+
+function hasAlreadySubmitted(roundId) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) || '{}');
+    const entry = stored[roundId];
+    if (!entry) return false;
+    // Allow resubmit after cooldown (in case of legitimate retry)
+    if (Date.now() - entry.ts > FEEDBACK_COOLDOWN_MS) return false;
+    return true;
+  } catch { return false; }
+}
+
+function markAsSubmitted(roundId) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) || '{}');
+    stored[roundId] = { ts: Date.now() };
+    // Clean up old entries (>7 days)
+    Object.keys(stored).forEach(id => {
+      if (Date.now() - stored[id].ts > 7 * 24 * 60 * 60 * 1000) delete stored[id];
+    });
+    localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(stored));
+  } catch {}
 }
 
 async function saveResponse(roundId, response) {
@@ -1762,6 +1814,9 @@ async function renderFeedbackFormStep(round, step) {
       </div>`;
 
     // Save to Supabase
+    const submitBtn = document.querySelector('#feedback-form-card .btn-primary');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Wysyłanie...'; }
+
     const ok = await saveResponse(round.id, {
       anonymous: fbAnon,
       respondent_name: fbAnon ? null : fbName,
@@ -1774,6 +1829,8 @@ async function renderFeedbackFormStep(round, step) {
           <h1 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:12px">Coś poszło nie tak</h1>
           <p style="color:var(--text2);font-size:15px">Nie udało się zapisać Twojego feedbacku. Spróbuj odświeżyć stronę i wypełnić formularz ponownie.</p>
         </div>`;
+    } else {
+      markAsSubmitted(round.id);
     }
     return;
   }
