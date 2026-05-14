@@ -1106,25 +1106,33 @@ async function handleLogout() {
 // ═══════════════════════════════════════════
 // ROUNDS — SUPABASE
 // ═══════════════════════════════════════════
+let roundsLoadController = null; // AbortController dla aktualnego requestu
+
 async function loadRounds() {
   const container = document.getElementById('rounds-container');
+
+  // Anuluj poprzedni request jeśli jeszcze wisi
+  if (roundsLoadController) {
+    roundsLoadController.abort();
+  }
+  roundsLoadController = new AbortController();
+  const signal = roundsLoadController.signal;
+
   container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  // Safety net — jeśli coś się zawiesi, po 8s pokaż błąd zamiast kręcić wiecznie
-  const timeout = setTimeout(() => {
-    if (container.querySelector('.spinner')) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏱️</div><h2 class="empty-title">Ładowanie trwa zbyt długo</h2><p class="empty-desc">Sprawdź połączenie z internetem i odśwież stronę.</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
-    }
-  }, 8000);
+  // Timeout 10s — po tym czasie anulujemy request
+  const timeoutId = setTimeout(() => roundsLoadController.abort(), 10000);
 
   try {
     const { data: rounds, error } = await sb
       .from('rounds')
       .select('*')
       .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .abortSignal(signal);
 
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
+    if (signal.aborted) return;
 
     if (error) {
       container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${error.message}</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
@@ -1145,15 +1153,24 @@ async function loadRounds() {
 
     const roundIds = rounds.map(r => r.id);
     const { data: respData } = roundIds.length
-      ? await sb.from('responses').select('round_id').in('round_id', roundIds)
+      ? await sb.from('responses').select('round_id').in('round_id', roundIds).abortSignal(signal)
       : { data: [] };
+
+    if (signal.aborted) return;
+
     const countMap = {};
     (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
 
     container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
 
   } catch (err) {
-    clearTimeout(timeout);
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError' || signal.aborted) {
+      // Request anulowany — sprawdź czy to timeout czy nowy request
+      if (!signal.aborted) return;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏱️</div><h2 class="empty-title">Ładowanie trwa zbyt długo</h2><p class="empty-desc">Sprawdź połączenie z internetem i spróbuj ponownie.</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
+      return;
+    }
     console.error('loadRounds error:', err);
     container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${err.message || 'Nieznany błąd'}</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
   }
