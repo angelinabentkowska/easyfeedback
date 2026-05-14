@@ -875,6 +875,12 @@ const SUPABASE_KEY = 'sb_publishable_pU-gbxhKqbgXpKH-vVNqfw_Sg5QRMPR';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Osobny klient bez sesji — do publicznego formularza feedbacku
+// Dzięki temu RLS "Anon reads open rounds" działa poprawnie
+// nawet gdy użytkownik jest zalogowany w tej samej przeglądarce
+const sbAnon = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false }
+});
 
 // ═══════════════════════════════════════════
 // DEFAULT QUESTION BANK (Publink values)
@@ -1666,8 +1672,9 @@ async function deleteQuestion(qId) {
 
 async function loadFeedbackForm(roundId) {
   const card = document.getElementById('feedback-form-card');
+  card.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  const { data: round, error } = await sb
+  const { data: round, error } = await sbAnon
     .from('rounds')
     .select('*')
     .eq('id', roundId)
@@ -1736,7 +1743,7 @@ function markAsSubmitted(roundId) {
 }
 
 async function saveResponse(roundId, response) {
-  const { error } = await sb.from('responses').insert({
+  const { error } = await sbAnon.from('responses').insert({
     round_id: roundId,
     anonymous: response.anonymous,
     respondent_name: response.respondent_name,
