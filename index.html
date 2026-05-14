@@ -1695,7 +1695,7 @@ async function renderFeedbackFormStep(round, step) {
       </div>
       <div class="scale-end-labels"><span>Słabo</span><span>Doskonale</span></div>`;
   } else if (q.type === 'open') {
-    answerHtml = `<textarea class="fq-textarea" id="open-answer" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
+    answerHtml = `<textarea class="fq-textarea" id="open-answer" maxlength="2000" maxlength="2000" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
   } else if (q.type === 'closed') {
     answerHtml = `
       <div class="radio-group">
