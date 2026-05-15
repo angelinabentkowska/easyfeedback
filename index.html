@@ -1788,42 +1788,55 @@ async function renderFeedbackFormStep(round, step) {
   const progress = Math.round((step / total) * 100);
 
   if (step === 0) {
-    // Intro + anon choice
-    card.innerHTML = `
-      <div class="feedback-form-header">
-        <div class="feedback-form-logo">EasyFeedback</div>
-        <h1 class="feedback-form-title">${round.name}</h1>
-        <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
-      </div>
-      ${round.allow_anonymous ? `
-      <div class="anon-toggle" id="anon-toggle-btn" style="margin-bottom:16px">
-        <div class="toggle on" id="anon-toggle-switch"></div>
-        <div class="anon-text">
-          <h4 id="anon-toggle-label">Chcę udzielić feedbacku anonimowo</h4>
-          <p>Twoje imię nie będzie widoczne dla odbiorcy</p>
-        </div>
-      </div>` : ''}
-      <div id="name-field" style="margin-bottom:24px;display:none">
-        <label class="form-label">Twoje imię i nazwisko</label>
-        <input class="form-input" id="fb-name" placeholder="np. Jan Kowalski">
-      </div>
-      <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
-
-    // Toggle anon - default ON (anonymous), show name when toggled OFF
-    fbAnon = true;
+    // Intro + anon choice — zachowanie zależy od ustawienia rundy
     if (round.allow_anonymous) {
+      // Właściciel pozwolił na anonimowość — respondent sam wybiera
+      fbAnon = true;
+      card.innerHTML = `
+        <div class="feedback-form-header">
+          <div class="feedback-form-logo">EasyFeedback</div>
+          <h1 class="feedback-form-title">${round.name}</h1>
+          <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
+        </div>
+        <div class="anon-toggle" id="anon-toggle-btn" style="margin-bottom:16px;cursor:pointer">
+          <div class="toggle on" id="anon-toggle-switch"></div>
+          <div class="anon-text">
+            <h4 id="anon-toggle-label">Chcę udzielić feedbacku anonimowo</h4>
+            <p>Twoje imię nie będzie widoczne dla odbiorcy</p>
+          </div>
+        </div>
+        <div id="name-field" style="margin-bottom:24px;display:none">
+          <label class="form-label">Twoje imię i nazwisko</label>
+          <input class="form-input" id="fb-name" placeholder="np. Jan Kowalski">
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
+
       const toggleBtn = card.querySelector('#anon-toggle-btn');
       const toggleSwitch = card.querySelector('#anon-toggle-switch');
       const nameField = card.querySelector('#name-field');
       const label = card.querySelector('#anon-toggle-label');
-      if (toggleBtn) {
-        toggleBtn.addEventListener('click', () => {
-          fbAnon = !fbAnon;
-          toggleSwitch.classList.toggle('on', fbAnon);
-          nameField.style.display = fbAnon ? 'none' : 'block';
-          label.textContent = fbAnon ? 'Chcę udzielić feedbacku anonimowo' : 'Podpisz swój feedback';
-        });
-      }
+      toggleBtn.addEventListener('click', () => {
+        fbAnon = !fbAnon;
+        toggleSwitch.classList.toggle('on', fbAnon);
+        nameField.style.display = fbAnon ? 'none' : 'block';
+        label.textContent = fbAnon ? 'Chcę udzielić feedbacku anonimowo' : 'Podpisz swój feedback';
+      });
+
+    } else {
+      // Właściciel wyłączył anonimowość — respondent MUSI podać imię
+      fbAnon = false;
+      card.innerHTML = `
+        <div class="feedback-form-header">
+          <div class="feedback-form-logo">EasyFeedback</div>
+          <h1 class="feedback-form-title">${round.name}</h1>
+          <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
+        </div>
+        <div style="margin-bottom:24px">
+          <label class="form-label">Twoje imię i nazwisko <span style="color:var(--red)">*</span></label>
+          <input class="form-input" id="fb-name" placeholder="np. Jan Kowalski" oninput="document.getElementById('fb-name-error').style.display='none'">
+          <p id="fb-name-error" style="color:var(--red);font-size:12px;margin-top:6px;display:none">Podanie imienia i nazwiska jest wymagane w tej rundzie.</p>
+        </div>
+        <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
     }
     return;
   }
@@ -1899,7 +1912,14 @@ async function renderFeedbackFormStep(round, step) {
 }
 
 function startFeedback() {
-  fbName = document.getElementById('fb-name')?.value || '';
+  fbName = document.getElementById('fb-name')?.value?.trim() || '';
+  // Jeśli anonimowość wyłączona — imię jest wymagane
+  if (!fbRound.allow_anonymous && !fbName) {
+    const err = document.getElementById('fb-name-error');
+    if (err) err.style.display = 'block';
+    document.getElementById('fb-name')?.focus();
+    return;
+  }
   renderFeedbackFormStep(fbRound, 1);
 }
 
