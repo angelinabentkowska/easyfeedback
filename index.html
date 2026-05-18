@@ -9,7 +9,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -2148,129 +2147,131 @@ function exportPDF(roundId) {
   const responses = currentRoundResponses;
   if (!round || !responses) { showToast('Brak danych do eksportu', 'error'); return; }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const date = new Date().toLocaleDateString('pl-PL');
+  const statusTxt = round.status === 'open' ? 'Aktywna' : 'Zakończona';
 
-  const W = 210;
-  const margin = 18;
-  const lineW = W - margin * 2;
-  let y = 20;
-
-  // Przejdź na nową stronę jeśli brakuje miejsca
-  const ensureSpace = (needed) => {
-    if (y + needed > 272) { doc.addPage(); y = 20; }
-  };
-  const nl = (extra = 0) => { y += 5 + extra; };
-  const separator = () => {
-    ensureSpace(8);
-    doc.setDrawColor(220,220,230);
-    doc.line(margin, y, W-margin, y);
-    nl(4);
-  };
-
-  // Header bar
-  doc.setFillColor(124,92,252);
-  doc.rect(0, 0, W, 14, 'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(10); doc.setFont('helvetica','bold');
-  doc.text('EasyFeedback — Raport rundy feedbacku', margin, 9.5);
-  y = 22;
-
-  // Title — zawijany
-  doc.setTextColor(20,20,40);
-  doc.setFontSize(16); doc.setFont('helvetica','bold');
-  const titleLines = doc.splitTextToSize(round.name, lineW);
-  doc.text(titleLines, margin, y);
-  y += titleLines.length * 7; nl(2);
-
-  // Status — zawijany
-  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,120);
-  const statusTxt = round.status === 'open' ? 'Aktywna' : 'Zakonczona';
-  const metaStr = `Status: ${statusTxt}  |  Odpowiedzi: ${responses.length}  |  Pytan: ${round.questions.length}  |  Data: ${new Date().toLocaleDateString('pl-PL')}`;
-  const metaLines = doc.splitTextToSize(metaStr, lineW);
-  doc.text(metaLines, margin, y);
-  y += metaLines.length * 5; nl(2);
-  separator();
-
-  // Per question
+  let questionsHtml = '';
   round.questions.forEach((q, qi) => {
-    // Numer pytania
-    ensureSpace(20);
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(124,92,252);
-    doc.text(`Pytanie ${qi+1} z ${round.questions.length}`, margin, y); nl(2);
-
-    // Treść pytania — zawijana
-    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,40);
-    const qLines = doc.splitTextToSize(q.text, lineW);
-    ensureSpace(qLines.length * 5 + 4);
-    doc.text(qLines, margin, y);
-    y += qLines.length * 5; nl(3);
-
     const qResponses = responses.map(r => r.answers[qi]).filter(a => a !== undefined && a !== null && a !== '');
+    let answerHtml = '';
 
     if (q.type === 'scale') {
       const nums = qResponses.filter(a => typeof a === 'number');
-      const avg = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1) : '-';
-      ensureSpace(30);
-      doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(124,92,252);
-      doc.text(avg + '/5', margin, y); nl(2);
-      doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,100);
-      for (let i=1;i<=5;i++) {
+      const avg = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1) : '—';
+      const dist = [1,2,3,4,5].map(i => {
         const cnt = nums.filter(n=>n===i).length;
         const pct = nums.length ? Math.round((cnt/nums.length)*100) : 0;
-        const bx = margin + (i-1)*34;
-        doc.text(`${i}:`, bx, y);
-        doc.setFillColor(pct > 0 ? 124 : 220, pct > 0 ? 92 : 220, pct > 0 ? 252 : 230);
-        doc.rect(bx+6, y-4, Math.max(pct*0.15,0.5), 4, 'F');
-        doc.setTextColor(80,80,100);
-        doc.text(`${cnt}x`, bx+24, y);
-      }
-      nl(5);
+        return `<div class="dist-row">
+          <span class="dist-label">${i}</span>
+          <div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(pct,1)}%"></div></div>
+          <span class="dist-count">${cnt}x (${pct}%)</span>
+        </div>`;
+      }).join('');
+      answerHtml = `<div class="avg">${avg}<span class="avg-denom">/5</span></div><div class="dist">${dist}</div>`;
 
     } else if (q.type === 'closed') {
       const yes = qResponses.filter(a=>a==='tak').length;
       const no = qResponses.filter(a=>a==='nie').length;
-      ensureSpace(14);
-      doc.setFontSize(11); doc.setFont('helvetica','bold');
-      doc.setTextColor(45,212,160); doc.text(`Tak: ${yes}`, margin, y);
-      doc.setTextColor(255,85,102); doc.text(`Nie: ${no}`, margin+35, y);
-      nl(6);
+      const total = yes + no;
+      const yesPct = total ? Math.round((yes/total)*100) : 0;
+      answerHtml = `<div class="closed-row">
+        <span class="yes">✓ Tak: <strong>${yes}</strong> (${yesPct}%)</span>
+        <span class="no">✗ Nie: <strong>${no}</strong> (${100-yesPct}%)</span>
+      </div>`;
 
     } else {
-      // Odpowiedzi otwarte — każda sprawdza czy się mieści
-      doc.setFontSize(9); doc.setFont('helvetica','normal');
-      qResponses.forEach((ans, ri) => {
-        const respObj = responses[ri];
-        const who = respObj?.anonymous ? 'Anonimowo' : (respObj?.respondent_name || 'Nieznany');
-        const ansLines = doc.splitTextToSize(String(ans), lineW - 8);
-        const blockH = ansLines.length * 5 + 10;
-        ensureSpace(blockH + 6); // przejdź na nową stronę jeśli blok się nie zmieści
-        doc.setFillColor(245,245,250);
-        doc.rect(margin, y-5, lineW, blockH, 'F');
-        doc.setTextColor(20,20,40);
-        doc.text(ansLines, margin+4, y);
-        y += ansLines.length * 5 + 2;
-        doc.setFontSize(8); doc.setTextColor(140,140,160);
-        doc.text(`— ${who}`, margin+4, y);
-        nl(5);
-        doc.setFontSize(9); doc.setTextColor(80,80,100);
-      });
+      if (qResponses.length === 0) {
+        answerHtml = '<p class="no-ans">Brak odpowiedzi</p>';
+      } else {
+        answerHtml = qResponses.map((ans, ri) => {
+          const respObj = responses[ri];
+          const who = respObj?.anonymous ? 'Anonimowo' : (respObj?.respondent_name || 'Nieznany');
+          return `<div class="open-ans"><p>${String(ans).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p><span class="who">— ${who}</span></div>`;
+        }).join('');
+      }
     }
-    separator();
+
+    questionsHtml += `<div class="q-block">
+      <div class="q-meta">Pytanie ${qi+1} z ${round.questions.length} · ${q.type === 'scale' ? 'Skala 1–5' : q.type === 'closed' ? 'Tak / Nie' : 'Odpowiedź otwarta'}</div>
+      <div class="q-text">${q.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      <div class="q-answers">${answerHtml}</div>
+    </div>`;
   });
 
-  // Numery stron
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i=1;i<=pageCount;i++) {
-    doc.setPage(i);
-    doc.setFontSize(8); doc.setTextColor(180,180,200); doc.setFont('helvetica','normal');
-    const footerLines = doc.splitTextToSize(`EasyFeedback · ${round.name} · Strona ${i}/${pageCount}`, lineW);
-    doc.text(footerLines, margin, 290);
+  const html = `<!DOCTYPE html><html lang="pl"><head>
+<meta charset="UTF-8">
+<title>Raport — ${round.name.replace(/</g,'&lt;')}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; background: #fff; }
+  .header { background: #7c5cfc; color: #fff; padding: 14px 24px 12px; }
+  .header-logo { font-size: 10px; font-weight: 700; letter-spacing: 1px; opacity: .8; margin-bottom: 4px; }
+  .header-title { font-size: 20px; font-weight: 800; line-height: 1.3; word-break: break-word; }
+  .header-meta { font-size: 10px; opacity: .8; margin-top: 6px; }
+  .stats { display: flex; gap: 0; border-bottom: 2px solid #e8e8f0; }
+  .stat { flex: 1; padding: 10px 16px; border-right: 1px solid #e8e8f0; text-align: center; }
+  .stat:last-child { border-right: none; }
+  .stat-val { font-size: 20px; font-weight: 800; color: #7c5cfc; }
+  .stat-lbl { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: .5px; }
+  .content { padding: 16px 24px; }
+  .q-block { margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid #e8e8f0; page-break-inside: avoid; break-inside: avoid; }
+  .q-block:last-child { border-bottom: none; }
+  .q-meta { font-size: 9px; color: #7c5cfc; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px; }
+  .q-text { font-size: 13px; font-weight: 700; color: #111; margin-bottom: 12px; line-height: 1.5; word-break: break-word; }
+  .avg { font-size: 30px; font-weight: 800; color: #7c5cfc; line-height: 1; margin-bottom: 8px; }
+  .avg-denom { font-size: 13px; color: #aaa; font-weight: 400; }
+  .dist { margin-top: 4px; }
+  .dist-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 11px; }
+  .dist-label { width: 12px; font-weight: 700; color: #555; text-align: right; }
+  .dist-bar-wrap { width: 120px; background: #ebebf5; border-radius: 3px; height: 8px; flex-shrink: 0; }
+  .dist-bar { background: #7c5cfc; height: 8px; border-radius: 3px; }
+  .dist-count { color: #888; font-size: 10px; }
+  .closed-row { display: flex; gap: 20px; font-size: 13px; }
+  .yes { color: #2dd4a0; }
+  .no { color: #ff5566; }
+  .open-ans { background: #f5f5fa; border-left: 3px solid #7c5cfc; padding: 8px 12px; margin-bottom: 7px; border-radius: 0 4px 4px 0; page-break-inside: avoid; break-inside: avoid; }
+  .open-ans p { color: #111; line-height: 1.6; margin-bottom: 3px; word-break: break-word; white-space: pre-wrap; }
+  .who { font-size: 10px; color: #aaa; }
+  .no-ans { color: #aaa; font-style: italic; font-size: 11px; }
+  .footer { text-align: center; font-size: 9px; color: #ccc; padding: 12px; border-top: 1px solid #eee; margin-top: 8px; }
+  @media print {
+    @page { margin: 1.5cm 1.8cm; size: A4; }
+    body { font-size: 11px; }
+    .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .dist-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .open-ans { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .stat-val { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .q-meta { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .no-print { display: none !important; }
   }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-logo">EASYFEEDBACK</div>
+  <div class="header-title">${round.name.replace(/</g,'&lt;')}</div>
+  <div class="header-meta">Status: ${statusTxt} · Data raportu: ${date}</div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="stat-val">${responses.length}</div><div class="stat-lbl">Odpowiedzi</div></div>
+  <div class="stat"><div class="stat-val">${round.questions.length}</div><div class="stat-lbl">Pytań</div></div>
+  <div class="stat"><div class="stat-val">${responses.filter(r=>r.anonymous).length}</div><div class="stat-lbl">Anonimowych</div></div>
+  <div class="stat"><div class="stat-val">${round.deadline || '—'}</div><div class="stat-lbl">Deadline</div></div>
+</div>
+<div class="content">
+  <div class="no-print" style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#856404">
+    💡 Aby zapisać jako PDF: <strong>Ctrl+P</strong> (lub Cmd+P na Mac) → wybierz <strong>„Zapisz jako PDF"</strong> → kliknij Zapisz.
+  </div>
+  ${questionsHtml}
+</div>
+<div class="footer">EasyFeedback · ${round.name.replace(/</g,'&lt;')} · Wygenerowano ${date}</div>
+<script>window.onload = function() { window.print(); }<\/script>
+</body></html>`;
 
-  const fileName = `feedback_${round.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
-  doc.save(fileName);
-  showToast('Plik PDF pobrany ✓', 'success');
+  const win = window.open('', '_blank');
+  if (!win) { showToast('Zezwól na otwieranie okien popup w przeglądarce', 'error'); return; }
+  win.document.write(html);
+  win.document.close();
 }
 </script>
 </body>
