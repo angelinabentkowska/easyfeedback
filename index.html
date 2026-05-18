@@ -1128,6 +1128,7 @@ async function handleLogout() {
 // ROUNDS — SUPABASE
 // ═══════════════════════════════════════════
 let roundsLoadController = null; // AbortController dla aktualnego requestu
+let roundsLoaded = false; // czy rundy zostały już załadowane
 
 async function loadRounds() {
   const container = document.getElementById('rounds-container');
@@ -1183,6 +1184,7 @@ async function loadRounds() {
     (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
 
     container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
+    roundsLoaded = true;
 
   } catch (err) {
     clearTimeout(timeoutId);
@@ -1237,6 +1239,7 @@ async function deleteRound(roundId) {
     return;
   }
   showToast('Twoja runda została usunięta', 'success');
+  roundsLoaded = false;
 
   // If grid is now empty, reload to show empty state
   const grid = document.querySelector('.rounds-grid');
@@ -1268,6 +1271,7 @@ async function createRound() {
   document.getElementById('round-deadline').value = '';
   renderSelectedQuestions();
   renderQuestionBank();
+  roundsLoaded = false;
   await loadRounds();
   showView('rounds');
 }
@@ -1436,6 +1440,7 @@ async function closeRound(roundId) {
   const { error } = await sb.from('rounds').update({ status: 'closed' }).eq('id', roundId);
   if (error) { showToast('Błąd zamykania rundy', 'error'); return; }
   showToast('Runda zamknięta', 'success');
+  roundsLoaded = false;
   await showRoundDetail(roundId);
 }
 
@@ -2013,7 +2018,7 @@ function showView(name) {
     renderSelectedQuestions();
   }
   if (name === 'questions') loadQuestionsAdmin();
-  if (name === 'rounds') loadRounds();
+  if (name === 'rounds' && !roundsLoaded) loadRounds();
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
