@@ -1025,11 +1025,13 @@ async function init() {
   }
 
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session) {
+    if (event === 'SIGNED_IN' && session && !currentUser) {
+      // Tylko gdy nie ma jeszcze zalogowanego użytkownika (unikamy podwójnego wywołania)
       currentUser = session.user;
       await enterApp();
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
+      roundsLoaded = false; // reset cache przy wylogowaniu
       showPage('auth');
     }
   });
@@ -1410,10 +1412,11 @@ async function showRoundDetail(roundId) {
       } else {
         html += `</div>`;
         html += `<div class="open-responses">`;
-        qResponses.forEach((resp, ri) => {
-          const respObj = responses[ri];
-          const who = respObj?.anonymous ? 'Anonimowo' : (respObj?.respondent_name || 'Nieznany');
-          html += `<div class="open-response">${resp}<div class="open-response-meta">${who}</div></div>`;
+        responses.forEach((respObj) => {
+          const ans = respObj.answers[qi];
+          if (ans === undefined || ans === null || ans === '') return;
+          const who = respObj.anonymous ? 'Anonimowo' : (respObj.respondent_name || 'Nieznany');
+          html += `<div class="open-response">${ans}<div class="open-response-meta">${who}</div></div>`;
         });
         html += `</div>`;
       }
@@ -1886,23 +1889,15 @@ async function renderFeedbackFormStep(round, step) {
   }
 
   if (step > total) {
-    // Thank you
-    card.innerHTML = `
-      <div style="text-align:center;padding:20px 0">
-        <div style="font-size:56px;margin-bottom:20px">🙌</div>
-        <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
-        <p style="color:var(--text2);font-size:15px">Właśnie dołożyłeś swoją cegiełkę w czyjś rozwój!</p>
-      </div>`;
-
-    // Save to Supabase
-    const submitBtn = document.querySelector('#feedback-form-card .btn-primary');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Wysyłanie...'; }
+    // Najpierw zapisz — potem pokaż ekran
+    card.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
     const ok = await saveResponse(round.id, {
       anonymous: fbAnon,
       respondent_name: fbAnon ? null : fbName,
       answers: fbAnswers
     });
+
     if (!ok) {
       card.innerHTML = `
         <div style="text-align:center;padding:20px 0">
@@ -1912,6 +1907,12 @@ async function renderFeedbackFormStep(round, step) {
         </div>`;
     } else {
       markAsSubmitted(round.id);
+      card.innerHTML = `
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:56px;margin-bottom:20px">🙌</div>
+          <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
+          <p style="color:var(--text2);font-size:15px">Właśnie dołożyłeś swoją cegiełkę w czyjś rozwój!</p>
+        </div>`;
     }
     return;
   }
@@ -1927,7 +1928,7 @@ async function renderFeedbackFormStep(round, step) {
       </div>
       <div class="scale-end-labels"><span>Słabo</span><span>Doskonale</span></div>`;
   } else if (q.type === 'open') {
-    answerHtml = `<textarea class="fq-textarea" id="open-answer" maxlength="2000" maxlength="2000" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
+    answerHtml = `<textarea class="fq-textarea" id="open-answer" maxlength="2000" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
   } else if (q.type === 'closed') {
     answerHtml = `
       <div class="radio-group">
