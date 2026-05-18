@@ -678,7 +678,12 @@
               <div>
                 <label class="form-label">Deadline (opcjonalnie)</label>
                 <input class="form-input" type="date" id="round-deadline" min="">
-                <script>document.getElementById('round-deadline').min = new Date().toISOString().split('T')[0];</script>
+                <script>
+                  (function() {
+                    const today = new Date().toISOString().split('T')[0];
+                    document.getElementById('round-deadline').min = today;
+                  })();
+                </script>
               </div>
             </div>
 
@@ -1254,6 +1259,13 @@ async function createRound() {
   if (selectedQuestions.length === 0) { showToast('Wybierz co najmniej jedno pytanie', 'error'); return; }
 
   const deadline = document.getElementById('round-deadline').value;
+  if (deadline) {
+    const today = new Date().toISOString().split('T')[0];
+    if (deadline < today) {
+      showToast('Deadline nie może być datą z przeszłości', 'error');
+      return;
+    }
+  }
   const allowAnon = document.getElementById('toggle-anon').classList.contains('on');
 
   const { error: createError } = await sb.from('rounds').insert({
