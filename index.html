@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -190,7 +192,19 @@
       flex-shrink: 0;
     }
     .user-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .theme-toggle {
+    .export-dropdown { position: relative; display: inline-block; }
+    .export-menu {
+      position: absolute; top: calc(100% + 6px); right: 0;
+      background: var(--bg2); border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      min-width: 160px; z-index: 100; overflow: hidden;
+    }
+    .export-menu button {
+      display: flex; align-items: center; width: 100%; padding: 10px 14px;
+      background: none; border: none; color: var(--text); font-size: 13px;
+      cursor: pointer; text-align: left;
+    }
+    .export-menu button:hover { background: var(--bg3); }
       display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;
       padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer;
       color: var(--text2); font-size: 13px;
@@ -972,6 +986,8 @@ let currentUser = null;
 let allQuestions = Object.values(TEMPLATES).filter(t => t.id !== 'custom').flatMap((t,ti) => t.questions.map((q,i) => ({...q, id: t.id+'_'+i})));
 let selectedQuestions = [];
 let currentRoundId = null;
+let currentRoundData = null;   // cache dla eksportu
+let currentRoundResponses = null; // cache dla eksportu
 let feedbackAnswers = {};
 let feedbackAnonymous = false;
 
@@ -1268,6 +1284,10 @@ async function showRoundDetail(roundId) {
   const { data: respData } = await sb.from('responses').select('*').eq('round_id', roundId);
   const responses = respData || [];
 
+  // Cache dla eksportu
+  currentRoundData = round;
+  currentRoundResponses = responses;
+
   const isOpen = round.status === 'open';
   const feedbackUrl = `${window.location.origin}${window.location.pathname}?feedback=${roundId}`;
 
@@ -1276,9 +1296,23 @@ async function showRoundDetail(roundId) {
 
   // Actions
   const actions = document.getElementById('detail-actions');
-  actions.innerHTML = isOpen
+  const exportBtns = responses.length > 0 ? `
+    <div class="export-dropdown" id="export-dropdown-${roundId}">
+      <button class="btn btn-secondary" onclick="toggleExportMenu('${roundId}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Pobierz odpowiedzi ▾
+      </button>
+      <div class="export-menu" id="export-menu-${roundId}" style="display:none">
+        <button onclick="exportXLS('${roundId}');toggleExportMenu('${roundId}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>Excel (.xlsx)
+        </button>
+        <button onclick="exportPDF('${roundId}');toggleExportMenu('${roundId}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF (.pdf)
+        </button>
+      </div>
+    </div>` : '';
+  actions.innerHTML = exportBtns + (isOpen
     ? `<button class="btn btn-danger" onclick="closeRound('${roundId}')">Zamknij rundę</button>`
-    : `<span class="badge badge-green" style="padding:8px 14px;font-size:12px">Zakończona</span>`;
+    : `<span class="badge badge-green" style="padding:8px 14px;font-size:12px">Zakończona</span>`);
 
   const content = document.getElementById('detail-content');
 
@@ -2015,6 +2049,199 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 // START
 // ═══════════════════════════════════════════
 init();
+
+// ═══════════════════════════════════════════
+// EKSPORT — XLS i PDF
+// ═══════════════════════════════════════════
+
+function toggleExportMenu(roundId) {
+  const menu = document.getElementById(`export-menu-${roundId}`);
+  if (!menu) return;
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+}
+
+// Zamknij dropdown przy kliknięciu poza nim
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.export-dropdown')) {
+    document.querySelectorAll('.export-menu').forEach(m => m.style.display = 'none');
+  }
+});
+
+
+  const round = currentRoundData;
+  const responses = currentRoundResponses;
+  if (!round || !responses) { showToast('Brak danych do eksportu', 'error'); return; }
+
+  const wb = XLSX.utils.book_new();
+
+  // Arkusz 1: Podsumowanie
+  const summaryData = [
+    ['EasyFeedback — Raport rundy'],
+    [],
+    ['Nazwa rundy:', round.name],
+    ['Status:', round.status === 'open' ? 'Aktywna' : 'Zakończona'],
+    ['Data utworzenia:', new Date(round.created_at).toLocaleDateString('pl-PL')],
+    ['Deadline:', round.deadline || '—'],
+    ['Liczba odpowiedzi:', responses.length],
+    ['Liczba pytań:', round.questions.length],
+    ['Anonimowych:', responses.filter(r => r.anonymous).length],
+    [],
+    ['Pytania skalowe — średnie ocen:'],
+  ];
+  round.questions.forEach((q, qi) => {
+    if (q.type === 'scale') {
+      const nums = responses.map(r => r.answers[qi]).filter(a => typeof a === 'number');
+      const avg = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2) : '—';
+      summaryData.push([q.text, avg + '/5']);
+    }
+  });
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+  wsSummary['!cols'] = [{ wch: 40 }, { wch: 20 }];
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Podsumowanie');
+
+  // Arkusz 2: Wszystkie odpowiedzi
+  const headers = ['Respondent', 'Anonimowo', 'Data odpowiedzi', ...round.questions.map((q, i) => `P${i+1}: ${q.text.substring(0,50)}`)];
+  const rows = responses.map(r => [
+    r.anonymous ? 'Anonimowo' : (r.respondent_name || 'Brak'),
+    r.anonymous ? 'Tak' : 'Nie',
+    new Date(r.submitted_at).toLocaleString('pl-PL'),
+    ...round.questions.map((q, qi) => {
+      const ans = r.answers[qi];
+      if (ans === undefined || ans === null || ans === '') return '—';
+      return ans;
+    })
+  ]);
+  const wsData = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  wsData['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 18 }, ...round.questions.map(() => ({ wch: 35 }))];
+  XLSX.utils.book_append_sheet(wb, wsData, 'Odpowiedzi');
+
+  // Arkusz 3: Pytania otwarte
+  const openQs = round.questions.filter(q => q.type === 'open');
+  if (openQs.length > 0) {
+    const openRows = [['Pytanie', 'Respondent', 'Odpowiedź']];
+    openQs.forEach(q => {
+      const qi = round.questions.indexOf(q);
+      responses.forEach(r => {
+        const ans = r.answers[qi];
+        if (ans) openRows.push([q.text, r.anonymous ? 'Anonimowo' : (r.respondent_name || 'Brak'), ans]);
+      });
+    });
+    const wsOpen = XLSX.utils.aoa_to_sheet(openRows);
+    wsOpen['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 60 }];
+    XLSX.utils.book_append_sheet(wb, wsOpen, 'Odpowiedzi otwarte');
+  }
+
+  const fileName = `feedback_${round.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  showToast('Plik XLS pobrany ✓', 'success');
+}
+
+function exportPDF(roundId) {
+  const round = currentRoundData;
+  const responses = currentRoundResponses;
+  if (!round || !responses) { showToast('Brak danych do eksportu', 'error'); return; }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const W = 210;
+  const margin = 18;
+  const lineW = W - margin * 2;
+  let y = 20;
+
+  const nl = (extra = 0) => { y += 5 + extra; if (y > 270) { doc.addPage(); y = 20; } };
+  const separator = () => { doc.setDrawColor(220,220,230); doc.line(margin, y, W-margin, y); nl(2); };
+
+  // Header bar
+  doc.setFillColor(124,92,252);
+  doc.rect(0, 0, W, 14, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text('EasyFeedback — Raport rundy feedbacku', margin, 9.5);
+  y = 22;
+
+  // Title
+  doc.setTextColor(20,20,40);
+  doc.setFontSize(18); doc.setFont('helvetica','bold');
+  doc.text(round.name, margin, y); nl(4);
+
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(100,100,120);
+  const statusTxt = round.status === 'open' ? 'Aktywna' : 'Zakończona';
+  doc.text(`Status: ${statusTxt}   ·   Odpowiedzi: ${responses.length}   ·   Pytań: ${round.questions.length}   ·   Data: ${new Date().toLocaleDateString('pl-PL')}`, margin, y);
+  nl(2); separator();
+
+  // Per question
+  round.questions.forEach((q, qi) => {
+    if (y > 250) { doc.addPage(); y = 20; }
+
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,40);
+    const qLines = doc.splitTextToSize(`${qi+1}. ${q.text}`, lineW);
+    doc.text(qLines, margin, y);
+    y += qLines.length * 5; nl(1);
+
+    const qResponses = responses.map(r => r.answers[qi]).filter(a => a !== undefined && a !== null && a !== '');
+
+    if (q.type === 'scale') {
+      const nums = qResponses.filter(a => typeof a === 'number');
+      const avg = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1) : '—';
+      doc.setFontSize(22); doc.setFont('helvetica','bold'); doc.setTextColor(124,92,252);
+      doc.text(avg + '/5', margin, y); nl(1);
+      doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,100);
+      for (let i=1;i<=5;i++) {
+        const cnt = nums.filter(n=>n===i).length;
+        const pct = nums.length ? Math.round((cnt/nums.length)*100) : 0;
+        const bx = margin + (i-1)*34;
+        doc.text(`${i}:`, bx, y);
+        doc.setFillColor(pct > 0 ? 124 : 220, pct > 0 ? 92 : 220, pct > 0 ? 252 : 230);
+        doc.rect(bx+6, y-4, Math.max(pct*0.15,0.5), 4, 'F');
+        doc.setTextColor(80,80,100);
+        doc.text(`${cnt}x`, bx+24, y);
+      }
+      nl(4);
+
+    } else if (q.type === 'closed') {
+      const yes = qResponses.filter(a=>a==='tak').length;
+      const no = qResponses.filter(a=>a==='nie').length;
+      doc.setFontSize(11); doc.setFont('helvetica','bold');
+      doc.setTextColor(45,212,160); doc.text(`Tak: ${yes}`, margin, y);
+      doc.setTextColor(255,85,102); doc.text(`Nie: ${no}`, margin+35, y);
+      nl(4);
+
+    } else {
+      doc.setFontSize(9); doc.setFont('helvetica','normal');
+      qResponses.forEach((ans, ri) => {
+        if (y > 260) { doc.addPage(); y = 20; }
+        const respObj = responses[ri];
+        const who = respObj?.anonymous ? 'Anonimowo' : (respObj?.respondent_name || 'Nieznany');
+        const ansLines = doc.splitTextToSize(String(ans), lineW - 8);
+        const blockH = ansLines.length * 5 + 9;
+        doc.setFillColor(245,245,250);
+        doc.rect(margin, y-5, lineW, blockH, 'F');
+        doc.setTextColor(20,20,40);
+        doc.text(ansLines, margin+4, y);
+        y += ansLines.length * 5 + 2;
+        doc.setFontSize(8); doc.setTextColor(140,140,160);
+        doc.text(`— ${who}`, margin+4, y);
+        nl(4);
+        doc.setFontSize(9); doc.setTextColor(80,80,100);
+      });
+    }
+    separator();
+  });
+
+  // Numery stron
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pageCount;i++) {
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(180,180,200); doc.setFont('helvetica','normal');
+    doc.text(`EasyFeedback · ${round.name} · Strona ${i}/${pageCount}`, margin, 290);
+  }
+
+  const fileName = `feedback_${round.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fileName);
+  showToast('Plik PDF pobrany ✓', 'success');
+}
 </script>
 </body>
 </html>
