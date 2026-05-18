@@ -893,7 +893,11 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Dzięki temu RLS "Anon reads open rounds" działa poprawnie
 // nawet gdy użytkownik jest zalogowany w tej samej przeglądarce
 const sbAnon = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false }
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    storageKey: 'sb-anon-no-session'
+  }
 });
 
 // ═══════════════════════════════════════════
@@ -1071,18 +1075,20 @@ async function handleLogin(e) {
   const btn = document.getElementById('login-btn');
   const msg = document.getElementById('login-msg');
   btn.disabled = true; btn.textContent = 'Logowanie...';
+  msg.textContent = '';
   msg.className = 'auth-msg';
 
   const { error } = await sb.auth.signInWithPassword({
-    email: document.getElementById('login-email').value,
+    email: document.getElementById('login-email').value.trim(),
     password: document.getElementById('login-password').value,
   });
 
+  btn.disabled = false; btn.textContent = 'Zaloguj się';
+
   if (error) {
-    msg.textContent = 'Nieprawidłowy e-mail lub hasło.';
+    msg.textContent = 'Wpisany e-mail lub hasło jest nieprawidłowe.';
     msg.className = 'auth-msg error';
   }
-  btn.disabled = false; btn.textContent = 'Zaloguj się';
 }
 
 async function handleRegister(e) {
@@ -2068,7 +2074,7 @@ document.addEventListener('click', (e) => {
   }
 });
 
-
+function exportXLS(roundId) {
   const round = currentRoundData;
   const responses = currentRoundResponses;
   if (!round || !responses) { showToast('Brak danych do eksportu', 'error'); return; }
