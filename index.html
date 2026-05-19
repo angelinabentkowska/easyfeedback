@@ -1074,6 +1074,11 @@ function switchAuthTab(tab) {
   });
   document.getElementById('form-login').classList.toggle('active', tab==='login');
   document.getElementById('form-register').classList.toggle('active', tab==='register');
+  // Wyczyść komunikaty przy przełączaniu
+  document.getElementById('login-msg').textContent = '';
+  document.getElementById('login-msg').className = 'auth-msg';
+  document.getElementById('reg-msg').textContent = '';
+  document.getElementById('reg-msg').className = 'auth-msg';
 }
 
 async function handleLogin(e) {
@@ -1102,29 +1107,66 @@ async function handleRegister(e) {
   const btn = document.getElementById('reg-btn');
   const msg = document.getElementById('reg-msg');
   btn.disabled = true; btn.textContent = 'Tworzenie konta...';
+  msg.textContent = '';
   msg.className = 'auth-msg';
 
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const name = document.getElementById('reg-name').value.trim();
+
+  // Walidacja po stronie frontu
+  if (!name) {
+    msg.textContent = 'Podaj imię i nazwisko.';
+    msg.className = 'auth-msg error';
+    btn.disabled = false; btn.textContent = 'Utwórz konto';
+    return;
+  }
+  if (password.length < 8) {
+    msg.textContent = 'Hasło musi mieć co najmniej 8 znaków.';
+    msg.className = 'auth-msg error';
+    btn.disabled = false; btn.textContent = 'Utwórz konto';
+    return;
+  }
+
   const { error } = await sb.auth.signUp({
-    email: document.getElementById('reg-email').value,
-    password: document.getElementById('reg-password').value,
-    options: { data: { full_name: document.getElementById('reg-name').value } }
+    email,
+    password,
+    options: { data: { full_name: name } }
   });
 
+  btn.disabled = false; btn.textContent = 'Utwórz konto';
+
   if (error) {
-    msg.textContent = error.message;
+    // Tłumaczenie błędów Supabase na polski
+    const errMap = {
+      'User already registered': 'Konto z tym adresem e-mail już istnieje.',
+      'invalid email': 'Podaj prawidłowy adres e-mail.',
+      'Invalid email': 'Podaj prawidłowy adres e-mail.',
+      'Password should be at least 6 characters': 'Hasło musi mieć co najmniej 8 znaków.',
+      'signup_disabled': 'Rejestracja jest tymczasowo wyłączona.',
+      'email_address_invalid': 'Podaj prawidłowy adres e-mail.',
+    };
+    const friendly = Object.entries(errMap).find(([k]) => error.message.includes(k));
+    msg.textContent = friendly ? friendly[1] : 'Błąd rejestracji: ' + error.message;
     msg.className = 'auth-msg error';
   } else {
-    msg.textContent = 'Sprawdź skrzynkę e-mail i potwierdź konto!';
+    // Sukces — wyczyść pola i pokaż komunikat
+    document.getElementById('reg-name').value = '';
+    document.getElementById('reg-email').value = '';
+    document.getElementById('reg-password').value = '';
+    msg.textContent = '✓ Sprawdź skrzynkę e-mail i potwierdź konto!';
     msg.className = 'auth-msg success';
   }
-  btn.disabled = false; btn.textContent = 'Utwórz konto';
 }
 
 async function handleGoogleLogin() {
-  await sb.auth.signInWithOAuth({
+  const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.href }
   });
+  if (error) {
+    showToast('Nie udało się zalogować przez Google', 'error');
+  }
 }
 
 async function handleLogout() {
