@@ -208,6 +208,7 @@
       width: 100%; padding: 7px 10px; font-size: 13px;
       background: none; border: none; border-radius: var(--radius-sm);
       color: var(--text3); cursor: pointer; text-align: center;
+      margin-top: 4px; border-top: 1px solid var(--border); padding-top: 12px;
     }
     .btn-logout:hover { background: var(--bg3); color: var(--red); }
 
@@ -250,6 +251,7 @@
       background: var(--bg2); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 22px; cursor: pointer;
       transition: all 0.2s; position: relative; overflow: hidden;
+      display: flex; flex-direction: column;
     }
     .round-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
     .round-card::before {
@@ -267,7 +269,7 @@
     .round-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 8px; }
     .round-meta { font-size: 13px; color: var(--text2); }
     .round-meta span { color: var(--text3); }
-    .round-footer { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .round-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
     .round-delete {
       position: absolute; top: 12px; right: 12px;
       width: 24px; height: 24px; border-radius: 50%;
@@ -327,6 +329,7 @@
       display: flex; align-items: flex-start; gap: 12px;
     }
     .sq-drag { color: var(--text3); cursor: grab; padding-top: 2px; }
+    .sq-item.drag-over { border: 2px dashed var(--accent); background: rgba(124,92,252,0.08); }
     .sq-content { flex: 1; }
     .sq-text { font-size: 14px; margin-bottom: 6px; }
     .sq-type { font-size: 11px; color: var(--text3); background: var(--bg4); padding: 2px 8px; border-radius: 4px; display: inline-block; }
@@ -1033,7 +1036,17 @@ async function enterApp() {
   document.getElementById('user-avatar').textContent = name[0].toUpperCase();
   syncThemeToggle();
   startInactivityWatcher();
-  await loadRounds();
+
+  // Przywróć widok z URL
+  const path = window.location.pathname;
+  if (path === '/nowa-runda') {
+    showView('new');
+  } else if (path === '/baza-pytan') {
+    showView('questions');
+  } else {
+    showView('rounds');
+  }
+
   renderQuestionBank();
 }
 
@@ -1131,6 +1144,9 @@ async function loadRounds() {
   const countMap = {};
   (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
 
+
+  // Sortuj: aktywne pierwsze, potem zamknięte
+  rounds.sort((a, b) => a.status === b.status ? 0 : a.status === 'open' ? -1 : 1);
   container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
 }
 
@@ -1211,7 +1227,7 @@ async function showRoundDetail(roundId) {
   const responses = respData || [];
 
   const isOpen = round.status === 'open';
-  const feedbackUrl = `${window.location.origin}${window.location.pathname}?feedback=${roundId}`;
+  const feedbackUrl = `${window.location.origin}/?feedback=${roundId}`;
 
   document.getElementById('detail-title').textContent = round.name;
   document.getElementById('detail-subtitle').textContent = `${responses.length} odpowiedzi · ${round.questions.length} pytań`;
@@ -1473,8 +1489,8 @@ function renderSelectedQuestions() {
     return;
   }
   list.innerHTML = selectedQuestions.map((q, i) => `
-    <div class="sq-item">
-      <div class="sq-drag">⠿</div>
+    <div class="sq-item" draggable="true" data-index="${i}">
+      <div class="sq-drag" title="Przeciągnij aby zmienić kolejność">⠿</div>
       <div class="sq-content">
         <div class="sq-text">${q.text}</div>
         <div style="display:flex;gap:8px;margin-top:4px;align-items:center">
@@ -1484,6 +1500,36 @@ function renderSelectedQuestions() {
       </div>
       <div class="sq-remove" onclick="removeSelectedQuestion(${i})">×</div>
     </div>`).join('');
+
+  // Drag & drop logic
+  let dragSrcIndex = null;
+  list.querySelectorAll('.sq-item').forEach(item => {
+    item.addEventListener('dragstart', e => {
+      dragSrcIndex = parseInt(item.dataset.index);
+      item.style.opacity = '0.4';
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => {
+      item.style.opacity = '1';
+      list.querySelectorAll('.sq-item').forEach(i => i.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      list.querySelectorAll('.sq-item').forEach(i => i.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      const dropIndex = parseInt(item.dataset.index);
+      if (dragSrcIndex === null || dragSrcIndex === dropIndex) return;
+      const moved = selectedQuestions.splice(dragSrcIndex, 1)[0];
+      selectedQuestions.splice(dropIndex, 0, moved);
+      dragSrcIndex = null;
+      renderQuestionBank();
+      renderSelectedQuestions();
+    });
+  });
 }
 
 function removeSelectedQuestion(idx) {
@@ -1546,9 +1592,14 @@ function loadQuestionsAdmin() {
 
   // Custom questions added by user
   const customQs = allQuestions.filter(q => q.id.startsWith('admin_') || q.id.startsWith('custom_'));
-  if (customQs.length > 0) {
-    html += `<div class="card" style="margin-bottom:16px">
-      <h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
+  html += `<div class="card" style="margin-bottom:16px">
+    <h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
+  if (customQs.length === 0) {
+    html += `<div style="text-align:center;padding:20px 0">
+      <div style="font-size:32px;margin-bottom:8px">📝</div>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:12px">Nie masz jeszcze własnych pytań.<br>Dodaj pierwsze klikając przycisk powyżej.</p>
+    </div>`;
+  } else {
     customQs.forEach(q => {
       html += `
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
@@ -1557,8 +1608,8 @@ function loadQuestionsAdmin() {
           <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>
         </div>`;
     });
-    html += `</div>`;
   }
+  html += `</div>`;
 
   container.innerHTML = html || '<p style="color:var(--text2);padding:20px">Brak pytań w bazie.</p>';
 }
@@ -1717,7 +1768,9 @@ async function renderFeedbackFormStep(round, step) {
       </div>
       <div class="scale-end-labels"><span>Słabo</span><span>Doskonale</span></div>`;
   } else if (q.type === 'open') {
-    answerHtml = `<textarea class="fq-textarea" id="open-answer" maxlength="2000" maxlength="2000" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
+    answerHtml = `
+      <textarea class="fq-textarea" id="open-answer" maxlength="2000" placeholder="Napisz swoją odpowiedź..." oninput="updateCharCount(this)">${fbAnswers[qi]||''}</textarea>
+      <div style="text-align:right;font-size:11px;color:var(--text3);margin-top:4px" id="char-count">${2000 - (fbAnswers[qi]||'').length} znaków pozostało</div>`;
   } else if (q.type === 'closed') {
     answerHtml = `
       <div class="radio-group">
@@ -1748,6 +1801,15 @@ async function renderFeedbackFormStep(round, step) {
 function startFeedback() {
   fbName = document.getElementById('fb-name')?.value || '';
   renderFeedbackFormStep(fbRound, 1);
+}
+
+function updateCharCount(textarea) {
+  const remaining = 2000 - textarea.value.length;
+  const el = document.getElementById('char-count');
+  if (el) {
+    el.textContent = `${remaining} znaków pozostało`;
+    el.style.color = remaining < 100 ? 'var(--red)' : 'var(--text3)';
+  }
 }
 
 function setScaleAnswer(qi, val) {
@@ -1792,6 +1854,10 @@ function showView(name) {
   const navEl = document.getElementById('nav-' + name);
   if (navEl) navEl.classList.add('active');
 
+  // Aktualizuj URL
+  const urlMap = { rounds: '/moje-rundy', new: '/nowa-runda', questions: '/baza-pytan' };
+  if (urlMap[name]) history.replaceState(null, '', urlMap[name]);
+
   if (name === 'new') {
     selectedQuestions = [];
     selectedTemplateId = null;
@@ -1801,7 +1867,7 @@ function showView(name) {
     renderSelectedQuestions();
   }
   if (name === 'questions') loadQuestionsAdmin();
-  if (name === 'rounds') loadRounds();
+  if (name === 'rounds' && !roundsLoaded) loadRounds();
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -1816,15 +1882,19 @@ function showToast(msg, type='success') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
+const MOON_ICON = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+const SUN_ICON = '<circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>';
+
 function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
-  const newTheme = isDark ? 'light' : 'dark';
-  html.setAttribute('data-theme', newTheme);
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
   const sw = document.getElementById('theme-switch');
   if (sw) sw.classList.toggle('on', !isDark);
   const lbl = document.getElementById('theme-label');
   if (lbl) lbl.textContent = isDark ? 'Ciemny motyw' : 'Jasny motyw';
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.innerHTML = isDark ? SUN_ICON : MOON_ICON;
 }
 
 function syncThemeToggle() {
@@ -1833,6 +1903,8 @@ function syncThemeToggle() {
   if (sw) sw.classList.toggle('on', !isDark);
   const lbl = document.getElementById('theme-label');
   if (lbl) lbl.textContent = isDark ? 'Jasny motyw' : 'Ciemny motyw';
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.innerHTML = isDark ? MOON_ICON : SUN_ICON;
 }
 
 // ═══════════════════════════════════════════
