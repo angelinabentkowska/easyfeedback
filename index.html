@@ -8,7 +8,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -178,11 +177,18 @@
     .nav-item:hover { background: var(--bg3); color: var(--text); }
     .nav-item.active { background: var(--bg3); color: var(--accent2); border-left-color: var(--accent2); }
     .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
-    .sidebar-bottom { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); text-align: center; }
+    .sidebar-bottom {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 12px;
+    }
     .user-pill {
       display: flex; align-items: center; gap: 10px;
       padding: 8px 10px; border-radius: var(--radius-sm);
-      background: var(--bg3); cursor: pointer;
+      background: var(--bg3);
     }
     .user-avatar {
       width: 30px; height: 30px; border-radius: 50%;
@@ -191,25 +197,19 @@
       flex-shrink: 0;
     }
     .user-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .export-dropdown { position: relative; display: inline-block; }
-    .export-menu {
-      position: absolute; top: calc(100% + 6px); right: 0;
-      background: var(--bg2); border: 1px solid var(--border2);
-      border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-      min-width: 160px; z-index: 100; overflow: hidden;
-    }
-    .export-menu button {
-      display: flex; align-items: center; width: 100%; padding: 10px 14px;
-      background: none; border: none; color: var(--text); font-size: 13px;
-      cursor: pointer; text-align: left;
-    }
-    .export-menu button:hover { background: var(--bg3); }
-      display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;
+    .theme-toggle {
+      display: flex; align-items: center; justify-content: space-between;
       padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer;
       color: var(--text2); font-size: 13px;
     }
     .theme-toggle:hover { background: var(--bg3); color: var(--text); }
-    .theme-toggle-label { display: flex; align-items: center; gap: 8px; }
+    .theme-toggle-left { display: flex; align-items: center; gap: 8px; pointer-events: none; }
+    .btn-logout {
+      width: 100%; padding: 7px 10px; font-size: 13px;
+      background: none; border: none; border-radius: var(--radius-sm);
+      color: var(--text3); cursor: pointer; text-align: center;
+    }
+    .btn-logout:hover { background: var(--bg3); color: var(--red); }
 
     /* ─── MAIN CONTENT ─── */
     .main { flex: 1; overflow-y: auto; }
@@ -625,18 +625,18 @@
     </div>
 
     <div class="sidebar-bottom">
+      <div class="user-pill">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-name" id="user-name">Ładowanie...</div>
+      </div>
       <div class="theme-toggle" onclick="toggleTheme()">
-        <div class="theme-toggle-label">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="theme-icon"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <div class="theme-toggle-left">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="theme-icon"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
           <span id="theme-label">Jasny motyw</span>
         </div>
         <div class="toggle" id="theme-switch"></div>
       </div>
-      <div class="user-pill" id="user-pill">
-        <div class="user-avatar" id="user-avatar">?</div>
-        <div class="user-name" id="user-name">Ładowanie...</div>
-      </div>
-      <button class="btn btn-ghost" style="width:100%;margin-top:8px;font-size:13px" onclick="handleLogout()">Wyloguj się</button>
+      <button class="btn-logout" onclick="handleLogout()">Wyloguj się</button>
     </div>
   </nav>
 
@@ -652,7 +652,9 @@
         <button class="btn btn-primary" onclick="showView('new')">+ Nowa runda</button>
       </div>
       <div class="content-area">
-        <div id="rounds-container"></div>
+        <div id="rounds-container">
+          <div class="loading-screen"><div class="spinner"></div></div>
+        </div>
       </div>
     </div>
 
@@ -678,12 +680,7 @@
               <div>
                 <label class="form-label">Deadline (opcjonalnie)</label>
                 <input class="form-input" type="date" id="round-deadline" min="">
-                <script>
-                  (function() {
-                    const today = new Date().toISOString().split('T')[0];
-                    document.getElementById('round-deadline').min = today;
-                  })();
-                </script>
+                <script>document.getElementById('round-deadline').min = new Date().toISOString().split('T')[0];</script>
               </div>
             </div>
 
@@ -691,7 +688,8 @@
               <h3>Ustawienia prywatności</h3>
               <div class="toggle-row">
                 <div class="toggle-info">
-                  <h4>Pozwalaj na udzielanie feedbacku anonimowo</h4>
+                  <h4>Anonimowe odpowiedzi</h4>
+                  <p>Respondenci mogą wybrać czy podpisać swoją odpowiedź</p>
                 </div>
                 <div class="toggle on" id="toggle-anon" onclick="this.classList.toggle('on')"></div>
               </div>
@@ -759,14 +757,12 @@
       <div class="main-header">
         <div>
           <h1 class="main-title">Baza pytań</h1>
-          <p class="main-subtitle">Domyślne pytania Publink + Twoje własne</p>
+          <p class="main-subtitle">Zarządzaj pulą pytań dostępnych dla wszystkich</p>
         </div>
         <button class="btn btn-primary" onclick="openAddQuestionModal()">+ Dodaj pytanie</button>
       </div>
-      <div class="content-area">
-        <div id="questions-admin-container">
-          <div class="loading-screen"><div class="spinner"></div></div>
-        </div>
+      <div class="content-area" id="questions-admin-container">
+        <div class="loading-screen"><div class="spinner"></div></div>
       </div>
     </div>
 
@@ -893,16 +889,6 @@ const SUPABASE_KEY = 'sb_publishable_pU-gbxhKqbgXpKH-vVNqfw_Sg5QRMPR';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-// Osobny klient bez sesji — do publicznego formularza feedbacku
-// Dzięki temu RLS "Anon reads open rounds" działa poprawnie
-// nawet gdy użytkownik jest zalogowany w tej samej przeglądarce
-const sbAnon = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-    storageKey: 'sb-anon-no-session'
-  }
-});
 
 // ═══════════════════════════════════════════
 // DEFAULT QUESTION BANK (Publink values)
@@ -994,8 +980,6 @@ let currentUser = null;
 let allQuestions = Object.values(TEMPLATES).filter(t => t.id !== 'custom').flatMap((t,ti) => t.questions.map((q,i) => ({...q, id: t.id+'_'+i})));
 let selectedQuestions = [];
 let currentRoundId = null;
-let currentRoundData = null;   // cache dla eksportu
-let currentRoundResponses = null; // cache dla eksportu
 let feedbackAnswers = {};
 let feedbackAnonymous = false;
 
@@ -1030,13 +1014,11 @@ async function init() {
   }
 
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session && !currentUser) {
-      // Tylko gdy nie ma jeszcze zalogowanego użytkownika (unikamy podwójnego wywołania)
+    if (event === 'SIGNED_IN' && session) {
       currentUser = session.user;
       await enterApp();
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
-      roundsLoaded = false; // reset cache przy wylogowaniu
       showPage('auth');
     }
   });
@@ -1047,20 +1029,6 @@ async function enterApp() {
   const name = currentUser.user_metadata?.full_name || currentUser.email.split('@')[0];
   document.getElementById('user-name').textContent = name;
   document.getElementById('user-avatar').textContent = name[0].toUpperCase();
-  syncThemeToggle();
-
-  // Load user's custom questions from Supabase into allQuestions
-  const { data: userQs } = await sb
-    .from('questions')
-    .select('*')
-    .eq('user_id', currentUser.id);
-  const existingIds = new Set(allQuestions.map(q => q.id));
-  (userQs || []).forEach(q => {
-    if (!existingIds.has(q.id)) {
-      allQuestions.push({ id: q.id, text: q.text, category: q.category, type: q.type });
-    }
-  });
-
   await loadRounds();
   renderQuestionBank();
 }
@@ -1074,11 +1042,6 @@ function switchAuthTab(tab) {
   });
   document.getElementById('form-login').classList.toggle('active', tab==='login');
   document.getElementById('form-register').classList.toggle('active', tab==='register');
-  // Wyczyść komunikaty przy przełączaniu
-  document.getElementById('login-msg').textContent = '';
-  document.getElementById('login-msg').className = 'auth-msg';
-  document.getElementById('reg-msg').textContent = '';
-  document.getElementById('reg-msg').className = 'auth-msg';
 }
 
 async function handleLogin(e) {
@@ -1086,20 +1049,18 @@ async function handleLogin(e) {
   const btn = document.getElementById('login-btn');
   const msg = document.getElementById('login-msg');
   btn.disabled = true; btn.textContent = 'Logowanie...';
-  msg.textContent = '';
   msg.className = 'auth-msg';
 
   const { error } = await sb.auth.signInWithPassword({
-    email: document.getElementById('login-email').value.trim(),
+    email: document.getElementById('login-email').value,
     password: document.getElementById('login-password').value,
   });
 
-  btn.disabled = false; btn.textContent = 'Zaloguj się';
-
   if (error) {
-    msg.textContent = 'Wpisany e-mail lub hasło jest nieprawidłowe.';
+    msg.textContent = 'Nieprawidłowy e-mail lub hasło.';
     msg.className = 'auth-msg error';
   }
+  btn.disabled = false; btn.textContent = 'Zaloguj się';
 }
 
 async function handleRegister(e) {
@@ -1107,66 +1068,29 @@ async function handleRegister(e) {
   const btn = document.getElementById('reg-btn');
   const msg = document.getElementById('reg-msg');
   btn.disabled = true; btn.textContent = 'Tworzenie konta...';
-  msg.textContent = '';
   msg.className = 'auth-msg';
 
-  const email = document.getElementById('reg-email').value.trim();
-  const password = document.getElementById('reg-password').value;
-  const name = document.getElementById('reg-name').value.trim();
-
-  // Walidacja po stronie frontu
-  if (!name) {
-    msg.textContent = 'Podaj imię i nazwisko.';
-    msg.className = 'auth-msg error';
-    btn.disabled = false; btn.textContent = 'Utwórz konto';
-    return;
-  }
-  if (password.length < 8) {
-    msg.textContent = 'Hasło musi mieć co najmniej 8 znaków.';
-    msg.className = 'auth-msg error';
-    btn.disabled = false; btn.textContent = 'Utwórz konto';
-    return;
-  }
-
   const { error } = await sb.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: name } }
+    email: document.getElementById('reg-email').value,
+    password: document.getElementById('reg-password').value,
+    options: { data: { full_name: document.getElementById('reg-name').value } }
   });
 
-  btn.disabled = false; btn.textContent = 'Utwórz konto';
-
   if (error) {
-    // Tłumaczenie błędów Supabase na polski
-    const errMap = {
-      'User already registered': 'Konto z tym adresem e-mail już istnieje.',
-      'invalid email': 'Podaj prawidłowy adres e-mail.',
-      'Invalid email': 'Podaj prawidłowy adres e-mail.',
-      'Password should be at least 6 characters': 'Hasło musi mieć co najmniej 8 znaków.',
-      'signup_disabled': 'Rejestracja jest tymczasowo wyłączona.',
-      'email_address_invalid': 'Podaj prawidłowy adres e-mail.',
-    };
-    const friendly = Object.entries(errMap).find(([k]) => error.message.includes(k));
-    msg.textContent = friendly ? friendly[1] : 'Błąd rejestracji: ' + error.message;
+    msg.textContent = error.message;
     msg.className = 'auth-msg error';
   } else {
-    // Sukces — wyczyść pola i pokaż komunikat
-    document.getElementById('reg-name').value = '';
-    document.getElementById('reg-email').value = '';
-    document.getElementById('reg-password').value = '';
-    msg.textContent = '✓ Sprawdź skrzynkę e-mail i potwierdź konto!';
+    msg.textContent = 'Sprawdź skrzynkę e-mail i potwierdź konto!';
     msg.className = 'auth-msg success';
   }
+  btn.disabled = false; btn.textContent = 'Utwórz konto';
 }
 
 async function handleGoogleLogin() {
-  const { error } = await sb.auth.signInWithOAuth({
+  await sb.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.href }
   });
-  if (error) {
-    showToast('Nie udało się zalogować przez Google', 'error');
-  }
 }
 
 async function handleLogout() {
@@ -1176,83 +1100,40 @@ async function handleLogout() {
 // ═══════════════════════════════════════════
 // ROUNDS — SUPABASE
 // ═══════════════════════════════════════════
-let roundsLoadController = null; // AbortController dla aktualnego requestu
-let roundsLoaded = false; // czy rundy zostały już załadowane
-
 async function loadRounds() {
   const container = document.getElementById('rounds-container');
-
-  // Anuluj poprzedni request jeśli jeszcze wisi
-  if (roundsLoadController) {
-    roundsLoadController.abort();
-  }
-  roundsLoadController = new AbortController();
-  const signal = roundsLoadController.signal;
-
   container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  // Timeout 10s — po tym czasie anulujemy request
-  const timeoutId = setTimeout(() => roundsLoadController.abort(), 10000);
+  const { data: rounds, error } = await sb
+    .from('rounds')
+    .select('*')
+    .order('created_at', { ascending: false });
 
-  try {
-    const { data: rounds, error } = await sb
-      .from('rounds')
-      .select('*')
-      .eq('user_id', currentUser.id)
-      .order('created_at', { ascending: false })
-      .abortSignal(signal);
+  if (error) { showToast('Błąd ładowania rund', 'error'); return; }
 
-    clearTimeout(timeoutId);
-    if (signal.aborted) return;
-
-    if (error) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${error.message}</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
-      showToast('Błąd ładowania rund', 'error');
-      return;
-    }
-
-    if (!rounds || rounds.length === 0) {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">📬</div>
-          <h2 class="empty-title">Brak rund feedbacku</h2>
-          <p class="empty-desc">Stwórz swoją pierwszą rundę i zbieraj feedback od zespołu</p>
-          <button class="btn btn-primary" onclick="showView('new')">Stwórz pierwszą rundę</button>
-        </div>`;
-      return;
-    }
-
-    const roundIds = rounds.map(r => r.id);
-    const { data: respData } = roundIds.length
-      ? await sb.from('responses').select('round_id').in('round_id', roundIds).abortSignal(signal)
-      : { data: [] };
-
-    if (signal.aborted) return;
-
-    const countMap = {};
-    (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
-
-    container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
-    roundsLoaded = true;
-
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError' || signal.aborted) {
-      // Request anulowany — sprawdź czy to timeout czy nowy request
-      if (!signal.aborted) return;
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏱️</div><h2 class="empty-title">Ładowanie trwa zbyt długo</h2><p class="empty-desc">Sprawdź połączenie z internetem i spróbuj ponownie.</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
-      return;
-    }
-    console.error('loadRounds error:', err);
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${err.message || 'Nieznany błąd'}</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
+  if (!rounds || rounds.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">📬</div>
+        <h2 class="empty-title">Brak rund feedbacku</h2>
+        <p class="empty-desc">Stwórz swoją pierwszą rundę i zbieraj feedback od zespołu</p>
+        <button class="btn btn-primary" onclick="showView('new')">Stwórz pierwszą rundę</button>
+      </div>`;
+    return;
   }
+
+  const { data: respData } = await sb.from('responses').select('round_id');
+  const countMap = {};
+  (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
+
+  container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
 }
 
 function renderRoundCard(round, responseCount = 0) {
   const isOpen = round.status === 'open';
   const date = new Date(round.created_at).toLocaleDateString('pl-PL', {day:'numeric',month:'long',year:'numeric'});
   return `
-    <div class="round-card" data-id="${round.id}" onclick="showRoundDetail('${round.id}')">
+    <div class="round-card" onclick="showRoundDetail('${round.id}')">
       <button class="round-delete" onclick="event.stopPropagation();confirmDeleteRound('${round.id}','${round.name.replace(/'/g,"\\'")}')">×</button>
       <div class="round-status ${isOpen ? 'open' : 'closed'}">${isOpen ? 'Aktywna' : 'Zamknięta'}</div>
       <div class="round-title">${round.name}</div>
@@ -1272,27 +1153,10 @@ function confirmDeleteRound(roundId, roundName) {
 }
 
 async function deleteRound(roundId) {
-  // Immediately remove card from DOM for instant feedback
-  const card = document.querySelector(`.round-card[data-id="${roundId}"]`);
-  if (card) {
-    card.style.transition = 'opacity 0.2s, transform 0.2s';
-    card.style.opacity = '0';
-    card.style.transform = 'scale(0.95)';
-    setTimeout(() => card.remove(), 200);
-  }
-
   const { error } = await sb.from('rounds').delete().eq('id', roundId);
-  if (error) {
-    showToast('Błąd usuwania rundy', 'error');
-    await loadRounds(); // restore if failed
-    return;
-  }
-  showToast('Twoja runda została usunięta', 'success');
-  roundsLoaded = false;
-
-  // If grid is now empty, reload to show empty state
-  const grid = document.querySelector('.rounds-grid');
-  if (grid && grid.children.length === 0) await loadRounds();
+  if (error) { showToast('Błąd usuwania rundy', 'error'); return; }
+  showToast('Runda usunięta', 'success');
+  await loadRounds();
 }
 
 async function createRound() {
@@ -1301,13 +1165,6 @@ async function createRound() {
   if (selectedQuestions.length === 0) { showToast('Wybierz co najmniej jedno pytanie', 'error'); return; }
 
   const deadline = document.getElementById('round-deadline').value;
-  if (deadline) {
-    const today = new Date().toISOString().split('T')[0];
-    if (deadline < today) {
-      showToast('Deadline nie może być datą z przeszłości', 'error');
-      return;
-    }
-  }
   const allowAnon = document.getElementById('toggle-anon').classList.contains('on');
 
   const { error: createError } = await sb.from('rounds').insert({
@@ -1327,7 +1184,6 @@ async function createRound() {
   document.getElementById('round-deadline').value = '';
   renderSelectedQuestions();
   renderQuestionBank();
-  roundsLoaded = false;
   await loadRounds();
   showView('rounds');
 }
@@ -1349,10 +1205,6 @@ async function showRoundDetail(roundId) {
   const { data: respData } = await sb.from('responses').select('*').eq('round_id', roundId);
   const responses = respData || [];
 
-  // Cache dla eksportu
-  currentRoundData = round;
-  currentRoundResponses = responses;
-
   const isOpen = round.status === 'open';
   const feedbackUrl = `${window.location.origin}${window.location.pathname}?feedback=${roundId}`;
 
@@ -1361,23 +1213,9 @@ async function showRoundDetail(roundId) {
 
   // Actions
   const actions = document.getElementById('detail-actions');
-  const exportBtns = responses.length > 0 ? `
-    <div class="export-dropdown" id="export-dropdown-${roundId}">
-      <button class="btn btn-secondary" onclick="toggleExportMenu('${roundId}')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Pobierz odpowiedzi ▾
-      </button>
-      <div class="export-menu" id="export-menu-${roundId}" style="display:none">
-        <button onclick="exportXLS('${roundId}');toggleExportMenu('${roundId}')">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>Excel (.xlsx)
-        </button>
-        <button onclick="exportPDF('${roundId}');toggleExportMenu('${roundId}')">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF (.pdf)
-        </button>
-      </div>
-    </div>` : '';
-  actions.innerHTML = exportBtns + (isOpen
+  actions.innerHTML = isOpen
     ? `<button class="btn btn-danger" onclick="closeRound('${roundId}')">Zamknij rundę</button>`
-    : `<span class="badge badge-green" style="padding:8px 14px;font-size:12px">Zakończona</span>`);
+    : `<span class="badge badge-green" style="padding:8px 14px;font-size:12px">Zakończona</span>`;
 
   const content = document.getElementById('detail-content');
 
@@ -1466,11 +1304,10 @@ async function showRoundDetail(roundId) {
       } else {
         html += `</div>`;
         html += `<div class="open-responses">`;
-        responses.forEach((respObj) => {
-          const ans = respObj.answers[qi];
-          if (ans === undefined || ans === null || ans === '') return;
-          const who = respObj.anonymous ? 'Anonimowo' : (respObj.respondent_name || 'Nieznany');
-          html += `<div class="open-response">${ans}<div class="open-response-meta">${who}</div></div>`;
+        qResponses.forEach((resp, ri) => {
+          const respObj = responses[ri];
+          const who = respObj?.anonymous ? 'Anonimowo' : (respObj?.respondent_name || 'Nieznany');
+          html += `<div class="open-response">${resp}<div class="open-response-meta">${who}</div></div>`;
         });
         html += `</div>`;
       }
@@ -1497,7 +1334,6 @@ async function closeRound(roundId) {
   const { error } = await sb.from('rounds').update({ status: 'closed' }).eq('id', roundId);
   if (error) { showToast('Błąd zamykania rundy', 'error'); return; }
   showToast('Runda zamknięta', 'success');
-  roundsLoaded = false;
   await showRoundDetail(roundId);
 }
 
@@ -1672,39 +1508,20 @@ function addCustomQuestion() {
 }
 
 // Questions Admin
-async function loadQuestionsAdmin() {
+function loadQuestionsAdmin() {
   const container = document.getElementById('questions-admin-container');
-  container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  // Load user's custom questions from Supabase
-  const { data: userQs, error } = await sb
-    .from('questions')
-    .select('*')
-    .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    container.innerHTML = `<p style="color:var(--red);padding:20px">Błąd ładowania pytań: ${error.message}</p>`;
-    return;
-  }
-
-  // Merge user questions into allQuestions (available for round creation)
-  const existingIds = new Set(allQuestions.map(q => q.id));
-  (userQs || []).forEach(q => {
-    if (!existingIds.has(q.id)) {
-      allQuestions.push({ id: q.id, text: q.text, category: q.category, type: q.type });
-    }
-  });
-
-  // Render built-in template questions
+  // Collect all questions from all templates
   const allTplQuestions = [];
   Object.values(TEMPLATES).forEach(tpl => {
     if (tpl.id === 'custom') return;
     tpl.questions.forEach(q => allTplQuestions.push({...q, source: tpl.emoji + ' ' + tpl.name}));
   });
-  const categories = [...new Set(allTplQuestions.map(q => q.category))];
 
+  // Group by category
+  const categories = [...new Set(allTplQuestions.map(q => q.category))];
   let html = '';
+
   categories.forEach(cat => {
     const qs = allTplQuestions.filter(q => q.category === cat);
     html += `<div class="card" style="margin-bottom:16px">
@@ -1722,17 +1539,15 @@ async function loadQuestionsAdmin() {
     html += `</div>`;
   });
 
-  // User's own questions from Supabase
-  if (userQs && userQs.length > 0) {
+  // Custom questions added by user
+  const customQs = allQuestions.filter(q => q.id.startsWith('admin_') || q.id.startsWith('custom_'));
+  if (customQs.length > 0) {
     html += `<div class="card" style="margin-bottom:16px">
       <h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
-    userQs.forEach(q => {
+    customQs.forEach(q => {
       html += `
         <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <div style="flex:1">
-            <div style="font-size:14px;margin-bottom:3px">${q.text}</div>
-            <span style="font-size:11px;color:var(--text3)">${q.category}</span>
-          </div>
+          <div style="flex:1;font-size:14px">${q.text}</div>
           <div class="badge badge-purple">${typeLabel(q.type)}</div>
           <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>
         </div>`;
@@ -1747,39 +1562,23 @@ function openAddQuestionModal() {
   openModal('modal-add-question');
 }
 
-async function saveQuestionToBank() {
+function saveQuestionToBank() {
   const text = document.getElementById('aq-text').value.trim();
   const category = document.getElementById('aq-category').value;
   const type = document.getElementById('aq-type').value;
   if (!text) { showToast('Wpisz treść pytania', 'error'); return; }
 
-  const btn = document.querySelector('#modal-add-question .btn-primary');
-  if (btn) { btn.disabled = true; btn.textContent = 'Zapisywanie...'; }
-
-  const { data, error } = await sb.from('questions').insert({
-    text, category, type,
-    user_id: currentUser.id
-  }).select().single();
-
-  if (btn) { btn.disabled = false; btn.textContent = 'Zapisz pytanie'; }
-
-  if (error) { showToast('Błąd zapisu: ' + error.message, 'error'); return; }
-
-  // Add to allQuestions for immediate availability in round creation
-  allQuestions.push({ id: data.id, text: data.text, category: data.category, type: data.type });
-
+  const q = { id: 'admin_' + Date.now(), text, category, type };
+  allQuestions.push(q);
   closeModal('modal-add-question');
   document.getElementById('aq-text').value = '';
-  await loadQuestionsAdmin();
-  showToast('Pytanie dodane do Twojej bazy ✓', 'success');
+  loadQuestionsAdmin();
+  showToast('Pytanie dodane do bazy ✓', 'success');
 }
 
-async function deleteQuestion(qId) {
-  const { error } = await sb.from('questions').delete().eq('id', qId).eq('user_id', currentUser.id);
-  if (error) { showToast('Błąd usuwania: ' + error.message, 'error'); return; }
-
+function deleteQuestion(qId) {
   allQuestions = allQuestions.filter(q => q.id !== qId);
-  await loadQuestionsAdmin();
+  loadQuestionsAdmin();
   showToast('Pytanie usunięte', 'success');
 }
 
@@ -1790,9 +1589,8 @@ async function deleteQuestion(qId) {
 
 async function loadFeedbackForm(roundId) {
   const card = document.getElementById('feedback-form-card');
-  card.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  const { data: round, error } = await sbAnon
+  const { data: round, error } = await sb
     .from('rounds')
     .select('*')
     .eq('id', roundId)
@@ -1818,61 +1616,17 @@ async function loadFeedbackForm(roundId) {
     return;
   }
 
-  if (hasAlreadySubmitted(round.id)) {
-    card.innerHTML = `
-      <div style="text-align:center;padding:40px">
-        <div style="font-size:48px;margin-bottom:16px">✅</div>
-        <h2 style="font-family:'Syne',sans-serif;margin-bottom:8px">Już wypełniłeś ten formularz</h2>
-        <p style="color:var(--text2)">Twój feedback dla tej rundy został już zapisany. Dziękujemy!</p>
-      </div>`;
-    return;
-  }
-
   renderFeedbackFormStep(round, 0);
 }
 
-// ═══════════════════════════════════════════
-// RATE LIMITING (localStorage — jedna odpowiedź na rundę per przeglądarka)
-// ═══════════════════════════════════════════
-const FEEDBACK_STORAGE_KEY = 'ef_submitted_rounds';
-const FEEDBACK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h cooldown
-
-function hasAlreadySubmitted(roundId) {
-  try {
-    const stored = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) || '{}');
-    const entry = stored[roundId];
-    if (!entry) return false;
-    // Allow resubmit after cooldown (in case of legitimate retry)
-    if (Date.now() - entry.ts > FEEDBACK_COOLDOWN_MS) return false;
-    return true;
-  } catch { return false; }
-}
-
-function markAsSubmitted(roundId) {
-  try {
-    const stored = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) || '{}');
-    stored[roundId] = { ts: Date.now() };
-    // Clean up old entries (>7 days)
-    Object.keys(stored).forEach(id => {
-      if (Date.now() - stored[id].ts > 7 * 24 * 60 * 60 * 1000) delete stored[id];
-    });
-    localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(stored));
-  } catch {}
-}
-
 async function saveResponse(roundId, response) {
-  const { error } = await sbAnon.from('responses').insert({
+  const { error } = await sb.from('responses').insert({
     round_id: roundId,
     anonymous: response.anonymous,
     respondent_name: response.respondent_name,
     answers: response.answers
   });
-  if (error) {
-    console.error('Error saving response:', error);
-    showToast('Błąd wysyłania odpowiedzi: ' + error.message, 'error');
-    return false;
-  }
-  return true;
+  if (error) console.error('Error saving response:', error);
 }
 
 let fbRound = null;
@@ -1889,85 +1643,61 @@ async function renderFeedbackFormStep(round, step) {
   const progress = Math.round((step / total) * 100);
 
   if (step === 0) {
-    // Intro + anon choice — zachowanie zależy od ustawienia rundy
-    if (round.allow_anonymous) {
-      // Właściciel pozwolił na anonimowość — respondent sam wybiera
-      fbAnon = true;
-      card.innerHTML = `
-        <div class="feedback-form-header">
-          <div class="feedback-form-logo">EasyFeedback</div>
-          <h1 class="feedback-form-title">${round.name}</h1>
-          <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
+    // Intro + anon choice
+    card.innerHTML = `
+      <div class="feedback-form-header">
+        <div class="feedback-form-logo">EasyFeedback</div>
+        <h1 class="feedback-form-title">${round.name}</h1>
+        <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
+      </div>
+      ${round.allow_anonymous ? `
+      <div class="anon-toggle" id="anon-toggle-btn" style="margin-bottom:16px">
+        <div class="toggle on" id="anon-toggle-switch"></div>
+        <div class="anon-text">
+          <h4 id="anon-toggle-label">Chcę udzielić feedbacku anonimowo</h4>
+          <p>Twoje imię nie będzie widoczne dla odbiorcy</p>
         </div>
-        <div class="anon-toggle" id="anon-toggle-btn" style="margin-bottom:16px;cursor:pointer">
-          <div class="toggle on" id="anon-toggle-switch"></div>
-          <div class="anon-text">
-            <h4 id="anon-toggle-label">Chcę udzielić feedbacku anonimowo</h4>
-            <p>Twoje imię nie będzie widoczne dla odbiorcy</p>
-          </div>
-        </div>
-        <div id="name-field" style="margin-bottom:24px;display:none">
-          <label class="form-label">Twoje imię i nazwisko</label>
-          <input class="form-input" id="fb-name" placeholder="np. Mariusz Pudzianowski">
-        </div>
-        <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
+      </div>` : ''}
+      <div id="name-field" style="margin-bottom:24px;display:none">
+        <label class="form-label">Twoje imię i nazwisko</label>
+        <input class="form-input" id="fb-name" placeholder="np. Jan Kowalski">
+      </div>
+      <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
 
+    // Toggle anon - default ON (anonymous), show name when toggled OFF
+    fbAnon = true;
+    if (round.allow_anonymous) {
       const toggleBtn = card.querySelector('#anon-toggle-btn');
       const toggleSwitch = card.querySelector('#anon-toggle-switch');
       const nameField = card.querySelector('#name-field');
       const label = card.querySelector('#anon-toggle-label');
-      toggleBtn.addEventListener('click', () => {
-        fbAnon = !fbAnon;
-        toggleSwitch.classList.toggle('on', fbAnon);
-        nameField.style.display = fbAnon ? 'none' : 'block';
-        label.textContent = fbAnon ? 'Chcę udzielić feedbacku anonimowo' : 'Podpisz swój feedback';
-      });
-
-    } else {
-      // Właściciel wyłączył anonimowość — respondent MUSI podać imię
-      fbAnon = false;
-      card.innerHTML = `
-        <div class="feedback-form-header">
-          <div class="feedback-form-logo">EasyFeedback</div>
-          <h1 class="feedback-form-title">${round.name}</h1>
-          <p class="feedback-form-desc">Twój szczery feedback pomaga tej osobie się rozwijać. Zajmie to ok. 3–5 minut.</p>
-        </div>
-        <div style="margin-bottom:24px">
-          <label class="form-label">Twoje imię i nazwisko <span style="color:var(--red)">*</span></label>
-          <input class="form-input" id="fb-name" placeholder="np. Mariusz Pudzianowski" oninput="document.getElementById('fb-name-error').style.display='none'">
-          <p id="fb-name-error" style="color:var(--red);font-size:12px;margin-top:6px;display:none">Podanie imienia i nazwiska jest wymagane w tej rundzie.</p>
-        </div>
-        <button class="btn btn-primary" style="width:100%" onclick="startFeedback()">Rozpocznij feedback →</button>`;
+      if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+          fbAnon = !fbAnon;
+          toggleSwitch.classList.toggle('on', fbAnon);
+          nameField.style.display = fbAnon ? 'none' : 'block';
+          label.textContent = fbAnon ? 'Chcę udzielić feedbacku anonimowo' : 'Podpisz swój feedback';
+        });
+      }
     }
     return;
   }
 
   if (step > total) {
-    // Najpierw zapisz — potem pokaż ekran
-    card.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
+    // Thank you
+    card.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:56px;margin-bottom:20px">🙌</div>
+        <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
+        <p style="color:var(--text2);font-size:15px">Właśnie dołożyłeś swoją cegiełkę w czyjś rozwój!</p>
+      </div>`;
 
-    const ok = await saveResponse(round.id, {
+    // Save to Supabase
+    await saveResponse(round.id, {
       anonymous: fbAnon,
       respondent_name: fbAnon ? null : fbName,
       answers: fbAnswers
     });
-
-    if (!ok) {
-      card.innerHTML = `
-        <div style="text-align:center;padding:20px 0">
-          <div style="font-size:56px;margin-bottom:20px">😕</div>
-          <h1 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:12px">Coś poszło nie tak</h1>
-          <p style="color:var(--text2);font-size:15px">Nie udało się zapisać Twojego feedbacku. Spróbuj odświeżyć stronę i wypełnić formularz ponownie.</p>
-        </div>`;
-    } else {
-      markAsSubmitted(round.id);
-      card.innerHTML = `
-        <div style="text-align:center;padding:20px 0">
-          <div style="font-size:56px;margin-bottom:20px">🙌</div>
-          <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
-          <p style="color:var(--text2);font-size:15px">Właśnie dołożyłeś swoją cegiełkę w czyjś rozwój!</p>
-        </div>`;
-    }
     return;
   }
 
@@ -1982,7 +1712,7 @@ async function renderFeedbackFormStep(round, step) {
       </div>
       <div class="scale-end-labels"><span>Słabo</span><span>Doskonale</span></div>`;
   } else if (q.type === 'open') {
-    answerHtml = `<textarea class="fq-textarea" id="open-answer" maxlength="2000" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
+    answerHtml = `<textarea class="fq-textarea" id="open-answer" maxlength="2000" maxlength="2000" placeholder="Napisz swoją odpowiedź...">${fbAnswers[qi]||''}</textarea>`;
   } else if (q.type === 'closed') {
     answerHtml = `
       <div class="radio-group">
@@ -2011,14 +1741,7 @@ async function renderFeedbackFormStep(round, step) {
 }
 
 function startFeedback() {
-  fbName = document.getElementById('fb-name')?.value?.trim() || '';
-  // Jeśli anonimowość wyłączona — imię jest wymagane
-  if (!fbRound.allow_anonymous && !fbName) {
-    const err = document.getElementById('fb-name-error');
-    if (err) err.style.display = 'block';
-    document.getElementById('fb-name')?.focus();
-    return;
-  }
+  fbName = document.getElementById('fb-name')?.value || '';
   renderFeedbackFormStep(fbRound, 1);
 }
 
@@ -2073,7 +1796,7 @@ function showView(name) {
     renderSelectedQuestions();
   }
   if (name === 'questions') loadQuestionsAdmin();
-  if (name === 'rounds' && !roundsLoaded) loadRounds();
+  if (name === 'rounds') loadRounds();
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -2091,16 +1814,8 @@ function showToast(msg, type='success') {
 function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
-  const newTheme = isDark ? 'light' : 'dark';
-  html.setAttribute('data-theme', newTheme);
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
   document.getElementById('theme-label').textContent = isDark ? 'Ciemny motyw' : 'Jasny motyw';
-  document.getElementById('theme-switch').classList.toggle('on', !isDark);
-}
-
-function syncThemeToggle() {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  document.getElementById('theme-label').textContent = isDark ? 'Jasny motyw' : 'Ciemny motyw';
-  document.getElementById('theme-switch').classList.toggle('on', !isDark);
 }
 
 // Close modals on overlay click
@@ -2114,225 +1829,6 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 // START
 // ═══════════════════════════════════════════
 init();
-
-// ═══════════════════════════════════════════
-// EKSPORT — XLS i PDF
-// ═══════════════════════════════════════════
-
-function toggleExportMenu(roundId) {
-  const menu = document.getElementById(`export-menu-${roundId}`);
-  if (!menu) return;
-  const isOpen = menu.style.display !== 'none';
-  menu.style.display = isOpen ? 'none' : 'block';
-}
-
-// Zamknij dropdown przy kliknięciu poza nim
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.export-dropdown')) {
-    document.querySelectorAll('.export-menu').forEach(m => m.style.display = 'none');
-  }
-});
-
-function exportXLS(roundId) {
-  const round = currentRoundData;
-  const responses = currentRoundResponses;
-  if (!round || !responses) { showToast('Brak danych do eksportu', 'error'); return; }
-
-  const wb = XLSX.utils.book_new();
-
-  // Arkusz 1: Podsumowanie
-  const summaryData = [
-    ['EasyFeedback — Raport rundy'],
-    [],
-    ['Nazwa rundy:', round.name],
-    ['Status:', round.status === 'open' ? 'Aktywna' : 'Zakończona'],
-    ['Data utworzenia:', new Date(round.created_at).toLocaleDateString('pl-PL')],
-    ['Deadline:', round.deadline || '—'],
-    ['Liczba odpowiedzi:', responses.length],
-    ['Liczba pytań:', round.questions.length],
-    ['Anonimowych:', responses.filter(r => r.anonymous).length],
-    [],
-    ['Pytania skalowe — średnie ocen:'],
-  ];
-  round.questions.forEach((q, qi) => {
-    if (q.type === 'scale') {
-      const nums = responses.map(r => r.answers[qi]).filter(a => typeof a === 'number');
-      const avg = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(2) : '—';
-      summaryData.push([q.text, avg + '/5']);
-    }
-  });
-  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
-  wsSummary['!cols'] = [{ wch: 40 }, { wch: 20 }];
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Podsumowanie');
-
-  // Arkusz 2: Wszystkie odpowiedzi
-  const headers = ['Respondent', 'Anonimowo', 'Data odpowiedzi', ...round.questions.map((q, i) => `P${i+1}: ${q.text}`)];
-  const rows = responses.map(r => [
-    r.anonymous ? 'Anonimowo' : (r.respondent_name || 'Brak'),
-    r.anonymous ? 'Tak' : 'Nie',
-    new Date(r.submitted_at).toLocaleString('pl-PL'),
-    ...round.questions.map((q, qi) => {
-      const ans = r.answers[qi];
-      if (ans === undefined || ans === null || ans === '') return '—';
-      return ans;
-    })
-  ]);
-  const wsData = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  wsData['!cols'] = [{ wch: 20 }, { wch: 12 }, { wch: 18 }, ...round.questions.map(() => ({ wch: 35 }))];
-  XLSX.utils.book_append_sheet(wb, wsData, 'Odpowiedzi');
-
-  // Arkusz 3: Pytania otwarte
-  const openQs = round.questions.filter(q => q.type === 'open');
-  if (openQs.length > 0) {
-    const openRows = [['Pytanie', 'Respondent', 'Odpowiedź']];
-    openQs.forEach(q => {
-      const qi = round.questions.indexOf(q);
-      responses.forEach(r => {
-        const ans = r.answers[qi];
-        if (ans) openRows.push([q.text, r.anonymous ? 'Anonimowo' : (r.respondent_name || 'Brak'), ans]);
-      });
-    });
-    const wsOpen = XLSX.utils.aoa_to_sheet(openRows);
-    wsOpen['!cols'] = [{ wch: 40 }, { wch: 20 }, { wch: 60 }];
-    XLSX.utils.book_append_sheet(wb, wsOpen, 'Odpowiedzi otwarte');
-  }
-
-  const fileName = `feedback_${round.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.xlsx`;
-  XLSX.writeFile(wb, fileName);
-  showToast('Plik XLS pobrany ✓', 'success');
-}
-
-function exportPDF(roundId) {
-  const round = currentRoundData;
-  const responses = currentRoundResponses;
-  if (!round || !responses) { showToast('Brak danych do eksportu', 'error'); return; }
-
-  const date = new Date().toLocaleDateString('pl-PL');
-  const statusTxt = round.status === 'open' ? 'Aktywna' : 'Zakończona';
-
-  let questionsHtml = '';
-  round.questions.forEach((q, qi) => {
-    const qResponses = responses.map(r => r.answers[qi]).filter(a => a !== undefined && a !== null && a !== '');
-    let answerHtml = '';
-
-    if (q.type === 'scale') {
-      const nums = qResponses.filter(a => typeof a === 'number');
-      const avg = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1) : '—';
-      const dist = [1,2,3,4,5].map(i => {
-        const cnt = nums.filter(n=>n===i).length;
-        const pct = nums.length ? Math.round((cnt/nums.length)*100) : 0;
-        return `<div class="dist-row">
-          <span class="dist-label">${i}</span>
-          <div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(pct,1)}%"></div></div>
-          <span class="dist-count">${cnt}x (${pct}%)</span>
-        </div>`;
-      }).join('');
-      answerHtml = `<div class="avg">${avg}<span class="avg-denom">/5</span></div><div class="dist">${dist}</div>`;
-
-    } else if (q.type === 'closed') {
-      const yes = qResponses.filter(a=>a==='tak').length;
-      const no = qResponses.filter(a=>a==='nie').length;
-      const total = yes + no;
-      const yesPct = total ? Math.round((yes/total)*100) : 0;
-      answerHtml = `<div class="closed-row">
-        <span class="yes">✓ Tak: <strong>${yes}</strong> (${yesPct}%)</span>
-        <span class="no">✗ Nie: <strong>${no}</strong> (${100-yesPct}%)</span>
-      </div>`;
-
-    } else {
-      if (qResponses.length === 0) {
-        answerHtml = '<p class="no-ans">Brak odpowiedzi</p>';
-      } else {
-        answerHtml = qResponses.map((ans, ri) => {
-          const respObj = responses[ri];
-          const who = respObj?.anonymous ? 'Anonimowo' : (respObj?.respondent_name || 'Nieznany');
-          return `<div class="open-ans"><p>${String(ans).replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p><span class="who">— ${who}</span></div>`;
-        }).join('');
-      }
-    }
-
-    questionsHtml += `<div class="q-block">
-      <div class="q-meta">Pytanie ${qi+1} z ${round.questions.length} · ${q.type === 'scale' ? 'Skala 1–5' : q.type === 'closed' ? 'Tak / Nie' : 'Odpowiedź otwarta'}</div>
-      <div class="q-text">${q.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-      <div class="q-answers">${answerHtml}</div>
-    </div>`;
-  });
-
-  const html = `<!DOCTYPE html><html lang="pl"><head>
-<meta charset="UTF-8">
-<title>Raport — ${round.name.replace(/</g,'&lt;')}</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111; background: #fff; }
-  .header { background: #7c5cfc; color: #fff; padding: 14px 24px 12px; }
-  .header-logo { font-size: 10px; font-weight: 700; letter-spacing: 1px; opacity: .8; margin-bottom: 4px; }
-  .header-title { font-size: 20px; font-weight: 800; line-height: 1.3; word-break: break-word; }
-  .header-meta { font-size: 10px; opacity: .8; margin-top: 6px; }
-  .stats { display: flex; gap: 0; border-bottom: 2px solid #e8e8f0; }
-  .stat { flex: 1; padding: 10px 16px; border-right: 1px solid #e8e8f0; text-align: center; }
-  .stat:last-child { border-right: none; }
-  .stat-val { font-size: 20px; font-weight: 800; color: #7c5cfc; }
-  .stat-lbl { font-size: 9px; color: #999; text-transform: uppercase; letter-spacing: .5px; }
-  .content { padding: 16px 24px; }
-  .q-block { margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid #e8e8f0; page-break-inside: avoid; break-inside: avoid; }
-  .q-block:last-child { border-bottom: none; }
-  .q-meta { font-size: 9px; color: #7c5cfc; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; margin-bottom: 5px; }
-  .q-text { font-size: 13px; font-weight: 700; color: #111; margin-bottom: 12px; line-height: 1.5; word-break: break-word; }
-  .avg { font-size: 30px; font-weight: 800; color: #7c5cfc; line-height: 1; margin-bottom: 8px; }
-  .avg-denom { font-size: 13px; color: #aaa; font-weight: 400; }
-  .dist { margin-top: 4px; }
-  .dist-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 11px; }
-  .dist-label { width: 12px; font-weight: 700; color: #555; text-align: right; }
-  .dist-bar-wrap { width: 120px; background: #ebebf5; border-radius: 3px; height: 8px; flex-shrink: 0; }
-  .dist-bar { background: #7c5cfc; height: 8px; border-radius: 3px; }
-  .dist-count { color: #888; font-size: 10px; }
-  .closed-row { display: flex; gap: 20px; font-size: 13px; }
-  .yes { color: #2dd4a0; }
-  .no { color: #ff5566; }
-  .open-ans { background: #f5f5fa; border-left: 3px solid #7c5cfc; padding: 8px 12px; margin-bottom: 7px; border-radius: 0 4px 4px 0; page-break-inside: avoid; break-inside: avoid; }
-  .open-ans p { color: #111; line-height: 1.6; margin-bottom: 3px; word-break: break-word; white-space: pre-wrap; }
-  .who { font-size: 10px; color: #aaa; }
-  .no-ans { color: #aaa; font-style: italic; font-size: 11px; }
-  .footer { text-align: center; font-size: 9px; color: #ccc; padding: 12px; border-top: 1px solid #eee; margin-top: 8px; }
-  @media print {
-    @page { margin: 1.5cm 1.8cm; size: A4; }
-    body { font-size: 11px; }
-    .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .dist-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .open-ans { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .stat-val { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .q-meta { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .no-print { display: none !important; }
-  }
-</style>
-</head>
-<body>
-<div class="header">
-  <div class="header-logo">EASYFEEDBACK</div>
-  <div class="header-title">${round.name.replace(/</g,'&lt;')}</div>
-  <div class="header-meta">Status: ${statusTxt} · Data raportu: ${date}</div>
-</div>
-<div class="stats">
-  <div class="stat"><div class="stat-val">${responses.length}</div><div class="stat-lbl">Odpowiedzi</div></div>
-  <div class="stat"><div class="stat-val">${round.questions.length}</div><div class="stat-lbl">Pytań</div></div>
-  <div class="stat"><div class="stat-val">${responses.filter(r=>r.anonymous).length}</div><div class="stat-lbl">Anonimowych</div></div>
-  <div class="stat"><div class="stat-val">${round.deadline || '—'}</div><div class="stat-lbl">Deadline</div></div>
-</div>
-<div class="content">
-  <div class="no-print" style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 14px;margin-bottom:16px;font-size:11px;color:#856404">
-    💡 Aby zapisać jako PDF: <strong>Ctrl+P</strong> (lub Cmd+P na Mac) → wybierz <strong>„Zapisz jako PDF"</strong> → kliknij Zapisz.
-  </div>
-  ${questionsHtml}
-</div>
-<div class="footer">EasyFeedback · ${round.name.replace(/</g,'&lt;')} · Wygenerowano ${date}</div>
-<script>window.onload = function() { window.print(); }<\/script>
-</body></html>`;
-
-  const win = window.open('', '_blank');
-  if (!win) { showToast('Zezwól na otwieranie okien popup w przeglądarce', 'error'); return; }
-  win.document.write(html);
-  win.document.close();
-}
 </script>
 </body>
 </html>
