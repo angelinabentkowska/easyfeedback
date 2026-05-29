@@ -1036,15 +1036,19 @@ async function enterApp() {
   document.getElementById('user-avatar').textContent = name[0].toUpperCase();
   syncThemeToggle();
   startInactivityWatcher();
+  roundsLoaded = false;
 
   // Przywróć widok z URL
   const path = window.location.pathname;
   if (path === '/nowa-runda') {
     showView('new');
+    await loadRounds(); // załaduj w tle żeby były gotowe gdy wróci
   } else if (path === '/baza-pytan') {
     showView('questions');
+    await loadRounds(); // j.w.
   } else {
-    showView('rounds');
+    await loadRounds(); // najpierw załaduj
+    showView('rounds'); // potem pokaż
   }
 
   renderQuestionBank();
@@ -1130,36 +1134,72 @@ async function handleLogout() {
 // ═══════════════════════════════════════════
 // ROUNDS — SUPABASE
 // ═══════════════════════════════════════════
-async function loadRounds() {
+let roundsLoadController = null;
+
+async function loadRounds(silent = false) {
   const container = document.getElementById('rounds-container');
-  container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
+  if (!container) return;
 
-  const { data: rounds, error } = await sb
-    .from('rounds')
-    .select('*')
-    .order('created_at', { ascending: false });
+  // Anuluj poprzedni wiszący request
+  if (roundsLoadController) roundsLoadController.abort();
+  roundsLoadController = new AbortController();
+  const signal = roundsLoadController.signal;
 
-  if (error) { showToast('Błąd ładowania rund', 'error'); return; }
-
-  if (!rounds || rounds.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📬</div>
-        <h2 class="empty-title">Brak rund feedbacku</h2>
-        <p class="empty-desc">Stwórz swoją pierwszą rundę i zbieraj feedback od zespołu</p>
-        <button class="btn btn-primary" onclick="showView('new')">Stwórz pierwszą rundę</button>
-      </div>`;
-    return;
+  // Pokaż spinner tylko przy pierwszym ładowaniu, nie przy cichym odświeżeniu
+  if (!silent) {
+    container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
   }
 
-  const { data: respData } = await sb.from('responses').select('round_id');
-  const countMap = {};
-  (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
+  const timeoutId = setTimeout(() => roundsLoadController?.abort(), 10000);
 
+  try {
+    const { data: rounds, error } = await sb
+      .from('rounds')
+      .select('*')
+      .eq('user_id', currentUser.id)
+      .order('created_at', { ascending: false })
+      .abortSignal(signal);
 
-  // Sortuj: aktywne pierwsze, potem zamknięte
-  rounds.sort((a, b) => a.status === b.status ? 0 : a.status === 'open' ? -1 : 1);
-  container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
+    clearTimeout(timeoutId);
+    if (signal.aborted) return;
+
+    if (error) {
+      if (!silent) container.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><h2 class="empty-title">Błąd ładowania</h2><p class="empty-desc">${error.message}</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
+      showToast('Błąd ładowania rund', 'error');
+      return;
+    }
+
+    if (!rounds || rounds.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📬</div>
+          <h2 class="empty-title">Brak rund feedbacku</h2>
+          <p class="empty-desc">Stwórz swoją pierwszą rundę i zbieraj feedback od zespołu</p>
+          <button class="btn btn-primary" onclick="showView('new')">Stwórz pierwszą rundę</button>
+        </div>`;
+      roundsLoaded = true;
+      return;
+    }
+
+    const roundIds = rounds.map(r => r.id);
+    const { data: respData } = roundIds.length
+      ? await sb.from('responses').select('round_id').in('round_id', roundIds).abortSignal(signal)
+      : { data: [] };
+
+    if (signal.aborted) return;
+
+    const countMap = {};
+    (respData || []).forEach(r => { countMap[r.round_id] = (countMap[r.round_id] || 0) + 1; });
+
+    rounds.sort((a, b) => a.status === b.status ? 0 : a.status === 'open' ? -1 : 1);
+    container.innerHTML = `<div class="rounds-grid">${rounds.map(r => renderRoundCard(r, countMap[r.id] || 0)).join('')}</div>`;
+    roundsLoaded = true;
+
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err?.name === 'AbortError') return;
+    if (!silent) container.innerHTML = `<div class="empty-state"><div class="empty-icon">⏱️</div><h2 class="empty-title">Ładowanie trwa zbyt długo</h2><p class="empty-desc">Sprawdź połączenie i spróbuj ponownie.</p><button class="btn btn-primary" onclick="loadRounds()">Spróbuj ponownie</button></div>`;
+  }
 }
 
 function renderRoundCard(round, responseCount = 0) {
@@ -1880,12 +1920,7 @@ function showView(name) {
     renderSelectedQuestions();
   }
   if (name === 'questions') loadQuestionsAdmin();
-  if (name === 'rounds') {
-    if (!roundsLoaded) {
-      loadRounds();
-    }
-    // Jeśli dane są — widok już pokazuje karty, nic nie rób
-  }
+  if (name === 'rounds') loadRounds(roundsLoaded); // cichy refresh jeśli dane już są
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
