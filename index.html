@@ -1135,6 +1135,7 @@ async function handleLogout() {
 // ROUNDS — SUPABASE
 // ═══════════════════════════════════════════
 let roundsLoadController = null;
+let roundsLoaded = false;
 
 async function loadRounds(silent = false) {
   const container = document.getElementById('rounds-container');
