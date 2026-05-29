@@ -1111,8 +1111,20 @@ async function handleGoogleLogin() {
 }
 
 async function handleLogout() {
+  const btn = document.querySelector('.btn-logout');
+  if (btn) { btn.disabled = true; btn.textContent = 'Wylogowywanie...'; }
   stopInactivityWatcher();
-  await sb.auth.signOut();
+  try {
+    await Promise.race([
+      sb.auth.signOut(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+    ]);
+  } catch {
+    // Timeout lub błąd — i tak przechodzimy do ekranu logowania
+  }
+  currentUser = null;
+  roundsLoaded = false;
+  showPage('auth');
 }
 
 // ═══════════════════════════════════════════
@@ -1597,7 +1609,8 @@ function loadQuestionsAdmin() {
   if (customQs.length === 0) {
     html += `<div style="text-align:center;padding:20px 0">
       <div style="font-size:32px;margin-bottom:8px">📝</div>
-      <p style="color:var(--text2);font-size:13px;margin-bottom:12px">Nie masz jeszcze własnych pytań.<br>Dodaj pierwsze klikając przycisk powyżej.</p>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:12px">Nie masz jeszcze własnych pytań.</p>
+      <button class="btn btn-primary" style="font-size:13px" onclick="openAddQuestionModal()">+ Dodaj pierwsze pytanie</button>
     </div>`;
   } else {
     customQs.forEach(q => {
@@ -1867,7 +1880,12 @@ function showView(name) {
     renderSelectedQuestions();
   }
   if (name === 'questions') loadQuestionsAdmin();
-  if (name === 'rounds' && !roundsLoaded) loadRounds();
+  if (name === 'rounds') {
+    if (!roundsLoaded) {
+      loadRounds();
+    }
+    // Jeśli dane są — widok już pokazuje karty, nic nie rób
+  }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
