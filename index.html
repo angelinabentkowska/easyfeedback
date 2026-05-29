@@ -374,12 +374,8 @@
     .qr-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .qr-text { font-size: 15px; font-weight: 600; }
     .qr-avg { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--accent2); }
-    .scale-bar { display: flex; gap: 6px; margin-bottom: 8px; }
-    .scale-segment {
-      flex: 1; height: 8px; border-radius: 4px; background: var(--bg4);
-      transition: background 0.3s;
-    }
-    .scale-segment.filled { background: var(--accent); }
+    .scale-bar { position: relative; height: 8px; background: var(--bg4); border-radius: 4px; margin-bottom: 8px; overflow: hidden; }
+    .scale-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--green)); transition: width 0.6s ease; }
     .scale-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); }
     .open-responses { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
     .open-response {
@@ -678,7 +674,11 @@
               <h3>Podstawowe informacje</h3>
               <div style="margin-bottom:16px">
                 <label class="form-label">Nazwa rundy</label>
-                <input class="form-input" id="round-name" maxlength="200" placeholder="np. feedback styczniowy; feedback po Q2; pytam, bo muszę...">
+                <input class="form-input" id="round-name" placeholder="np. feedback styczniowy; feedback po Q2; pytam, bo muszę..." oninput="updateRoundNameCounter()">
+                <div style="display:flex;justify-content:space-between;margin-top:4px">
+                  <span id="round-name-error" style="font-size:12px;color:var(--red);display:none">Nazwa rundy nie może przekraczać 200 znaków.</span>
+                  <span id="round-name-counter" style="font-size:11px;color:var(--text3);margin-left:auto">200 znaków pozostało</span>
+                </div>
               </div>
               <div>
                 <label class="form-label">Deadline (opcjonalnie)</label>
@@ -1017,9 +1017,13 @@ async function init() {
   }
 
   sb.auth.onAuthStateChange(async (event, session) => {
-    if (event === 'SIGNED_IN' && session) {
+    if (event === 'SIGNED_IN' && session && !currentUser) {
+      // Tylko przy pierwszym logowaniu — nie przy TOKEN_REFRESHED
       currentUser = session.user;
       await enterApp();
+    } else if (event === 'TOKEN_REFRESHED' && session) {
+      // Cicho aktualizuj usera, nie przeładowuj UI
+      currentUser = session.user;
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
       roundsLoaded = false;
@@ -1236,6 +1240,7 @@ async function deleteRound(roundId) {
 async function createRound() {
   const name = document.getElementById('round-name').value.trim();
   if (!name) { showToast('Podaj nazwę rundy', 'error'); return; }
+  if (name.length > 200) { showToast('Nazwa rundy nie może przekraczać 200 znaków', 'error'); return; }
   if (selectedQuestions.length === 0) { showToast('Wybierz co najmniej jedno pytanie', 'error'); return; }
 
   const deadline = document.getElementById('round-deadline').value;
@@ -1351,11 +1356,10 @@ async function showRoundDetail(roundId) {
         html += `</div>`;
         // Bar
         const avgNum = parseFloat(avg);
-        html += `<div class="scale-bar">`;
-        for (let i=1;i<=5;i++) {
-          html += `<div class="scale-segment${i<=Math.round(avgNum)?' filled':''}"></div>`;
-        }
-        html += `</div><div class="scale-labels"><span>1 — Słabo</span><span>5 — Doskonale</span></div>`;
+        // Pasek proporcjonalny do średniej (4.8/5 = 96%)
+        const pct = (avgNum / 5 * 100).toFixed(1);
+        html += `<div class="scale-bar"><div class="scale-fill" style="width:${pct}%"></div></div>`;
+        html += `<div class="scale-labels"><span>1 — Słabo</span><span>5 — Doskonale</span></div>`;
         // Distribution
         html += `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">`;
         for (let i=1;i<=5;i++) {
@@ -1855,6 +1859,18 @@ async function renderFeedbackFormStep(round, step) {
 function startFeedback() {
   fbName = document.getElementById('fb-name')?.value || '';
   renderFeedbackFormStep(fbRound, 1);
+}
+
+function updateRoundNameCounter() {
+  const val = document.getElementById('round-name').value;
+  const remaining = 200 - val.length;
+  const counter = document.getElementById('round-name-counter');
+  const error = document.getElementById('round-name-error');
+  if (counter) {
+    counter.textContent = `${remaining} znaków pozostało`;
+    counter.style.color = remaining < 20 ? 'var(--red)' : 'var(--text3)';
+  }
+  if (error) error.style.display = remaining < 0 ? 'block' : 'none';
 }
 
 function updateCharCount(textarea) {
