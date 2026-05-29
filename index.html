@@ -1019,6 +1019,8 @@ async function init() {
       await enterApp();
     } else if (event === 'SIGNED_OUT') {
       currentUser = null;
+      roundsLoaded = false;
+      stopInactivityWatcher();
       showPage('auth');
     }
   });
@@ -1029,6 +1031,8 @@ async function enterApp() {
   const name = currentUser.user_metadata?.full_name || currentUser.email.split('@')[0];
   document.getElementById('user-name').textContent = name;
   document.getElementById('user-avatar').textContent = name[0].toUpperCase();
+  syncThemeToggle();
+  startInactivityWatcher();
   await loadRounds();
   renderQuestionBank();
 }
@@ -1094,6 +1098,7 @@ async function handleGoogleLogin() {
 }
 
 async function handleLogout() {
+  stopInactivityWatcher();
   await sb.auth.signOut();
 }
 
@@ -1814,8 +1819,50 @@ function showToast(msg, type='success') {
 function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
-  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  document.getElementById('theme-label').textContent = isDark ? 'Ciemny motyw' : 'Jasny motyw';
+  const newTheme = isDark ? 'light' : 'dark';
+  html.setAttribute('data-theme', newTheme);
+  const sw = document.getElementById('theme-switch');
+  if (sw) sw.classList.toggle('on', !isDark);
+  const lbl = document.getElementById('theme-label');
+  if (lbl) lbl.textContent = isDark ? 'Ciemny motyw' : 'Jasny motyw';
+}
+
+function syncThemeToggle() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const sw = document.getElementById('theme-switch');
+  if (sw) sw.classList.toggle('on', !isDark);
+  const lbl = document.getElementById('theme-label');
+  if (lbl) lbl.textContent = isDark ? 'Jasny motyw' : 'Ciemny motyw';
+}
+
+// ═══════════════════════════════════════════
+// AUTO-LOGOUT po 4 godzinach nieaktywności
+// ═══════════════════════════════════════════
+const INACTIVITY_TIMEOUT = 4 * 60 * 60 * 1000; // 4 godziny w ms
+let inactivityTimer = null;
+
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(async () => {
+    if (currentUser) {
+      await sb.auth.signOut();
+      showToast('Zostałeś wylogowany z powodu braku aktywności', 'error');
+    }
+  }, INACTIVITY_TIMEOUT);
+}
+
+function startInactivityWatcher() {
+  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach(evt => {
+    document.addEventListener(evt, resetInactivityTimer, { passive: true });
+  });
+  resetInactivityTimer(); // start od razu po zalogowaniu
+}
+
+function stopInactivityWatcher() {
+  clearTimeout(inactivityTimer);
+  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach(evt => {
+    document.removeEventListener(evt, resetInactivityTimer);
+  });
 }
 
 // Close modals on overlay click
