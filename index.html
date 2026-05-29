@@ -892,6 +892,16 @@ const SUPABASE_KEY = 'sb_publishable_pU-gbxhKqbgXpKH-vVNqfw_Sg5QRMPR';
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Osobny klient bez sesji — do publicznego formularza feedbacku
+// Dzięki temu RLS "Anon reads open rounds" działa poprawnie
+// nawet gdy użytkownik jest zalogowany w tej samej przeglądarce
+const sbAnon = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    storageKey: 'sb-anon-no-session'
+  }
+});
 
 // ═══════════════════════════════════════════
 // DEFAULT QUESTION BANK (Publink values)
@@ -1041,6 +1051,13 @@ async function enterApp() {
   syncThemeToggle();
   startInactivityWatcher();
   roundsLoaded = false;
+
+  // Załaduj własne pytania użytkownika z Supabase do allQuestions
+  const { data: userQs } = await sb.from('questions').select('*').eq('user_id', currentUser.id);
+  const existingIds = new Set(allQuestions.map(q => q.id));
+  (userQs || []).forEach(q => {
+    if (!existingIds.has(q.id)) allQuestions.push({ id: q.id, text: q.text, category: q.category, type: q.type });
+  });
 
   // Przywróć widok z URL
   const path = window.location.pathname;
@@ -1616,83 +1633,96 @@ function addCustomQuestion() {
 }
 
 // Questions Admin
-function loadQuestionsAdmin() {
+async function loadQuestionsAdmin() {
   const container = document.getElementById('questions-admin-container');
+  container.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-  // Collect all questions from all templates
+  const { data: userQs } = await sb
+    .from('questions')
+    .select('*')
+    .eq('user_id', currentUser.id)
+    .order('created_at', { ascending: true });
+
+  // Merge do allQuestions
+  const existingIds = new Set(allQuestions.map(q => q.id));
+  (userQs || []).forEach(q => {
+    if (!existingIds.has(q.id)) allQuestions.push({ id: q.id, text: q.text, category: q.category, type: q.type });
+  });
+
   const allTplQuestions = [];
   Object.values(TEMPLATES).forEach(tpl => {
     if (tpl.id === 'custom') return;
     tpl.questions.forEach(q => allTplQuestions.push({...q, source: tpl.emoji + ' ' + tpl.name}));
   });
 
-  // Group by category
   const categories = [...new Set(allTplQuestions.map(q => q.category))];
   let html = '';
-
   categories.forEach(cat => {
     const qs = allTplQuestions.filter(q => q.category === cat);
-    html += `<div class="card" style="margin-bottom:16px">
-      <h3 style="margin-bottom:16px;font-size:15px">${cat}</h3>`;
+    html += `<div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:16px;font-size:15px">${cat}</h3>`;
     qs.forEach(q => {
-      html += `
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <div style="flex:1">
-            <div style="font-size:14px;margin-bottom:3px">${q.text}</div>
-            <span style="font-size:11px;color:var(--text3)">${q.source}</span>
-          </div>
-          <div class="badge badge-purple">${typeLabel(q.type)}</div>
-        </div>`;
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1"><div style="font-size:14px;margin-bottom:3px">${q.text}</div>
+        <span style="font-size:11px;color:var(--text3)">${q.source}</span></div>
+        <div class="badge badge-purple">${typeLabel(q.type)}</div></div>`;
     });
     html += `</div>`;
   });
 
-  // Custom questions added by user
-  const customQs = allQuestions.filter(q => q.id.startsWith('admin_') || q.id.startsWith('custom_'));
-  html += `<div class="card" style="margin-bottom:16px">
-    <h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
-  if (customQs.length === 0) {
+  html += `<div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
+  if (!userQs || userQs.length === 0) {
     html += `<div style="text-align:center;padding:20px 0">
       <div style="font-size:32px;margin-bottom:8px">📝</div>
       <p style="color:var(--text2);font-size:13px;margin-bottom:12px">Nie masz jeszcze własnych pytań.</p>
       <button class="btn btn-primary" style="font-size:13px" onclick="openAddQuestionModal()">+ Dodaj pierwsze pytanie</button>
     </div>`;
   } else {
-    customQs.forEach(q => {
-      html += `
-        <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-          <div style="flex:1;font-size:14px">${q.text}</div>
-          <div class="badge badge-purple">${typeLabel(q.type)}</div>
-          <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>
-        </div>`;
+    userQs.forEach(q => {
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1"><div style="font-size:14px;margin-bottom:3px">${q.text}</div>
+        <span style="font-size:11px;color:var(--text3)">${q.category}</span></div>
+        <div class="badge badge-purple">${typeLabel(q.type)}</div>
+        <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteQuestion('${q.id}')">Usuń</button>
+      </div>`;
     });
   }
   html += `</div>`;
-
-  container.innerHTML = html || '<p style="color:var(--text2);padding:20px">Brak pytań w bazie.</p>';
+  container.innerHTML = html;
 }
 
 function openAddQuestionModal() {
   openModal('modal-add-question');
 }
 
-function saveQuestionToBank() {
+async function saveQuestionToBank() {
   const text = document.getElementById('aq-text').value.trim();
   const category = document.getElementById('aq-category').value;
   const type = document.getElementById('aq-type').value;
   if (!text) { showToast('Wpisz treść pytania', 'error'); return; }
 
-  const q = { id: 'admin_' + Date.now(), text, category, type };
-  allQuestions.push(q);
+  const btn = document.querySelector('#modal-add-question .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Zapisywanie...'; }
+
+  const { data, error } = await sb.from('questions').insert({
+    text, category, type, user_id: currentUser.id
+  }).select().single();
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Zapisz pytanie'; }
+
+  if (error) { showToast('Błąd zapisu: ' + error.message, 'error'); return; }
+
+  allQuestions.push({ id: data.id, text: data.text, category: data.category, type: data.type });
   closeModal('modal-add-question');
   document.getElementById('aq-text').value = '';
-  loadQuestionsAdmin();
+  await loadQuestionsAdmin();
   showToast('Pytanie dodane do bazy ✓', 'success');
 }
 
-function deleteQuestion(qId) {
+async function deleteQuestion(qId) {
+  const { error } = await sb.from('questions').delete().eq('id', qId).eq('user_id', currentUser.id);
+  if (error) { showToast('Błąd usuwania: ' + error.message, 'error'); return; }
   allQuestions = allQuestions.filter(q => q.id !== qId);
-  loadQuestionsAdmin();
+  await loadQuestionsAdmin();
   showToast('Pytanie usunięte', 'success');
 }
 
@@ -1701,10 +1731,37 @@ function deleteQuestion(qId) {
 // ═══════════════════════════════════════════
 // getRoundById replaced by direct Supabase call in loadFeedbackForm
 
+// ═══════════════════════════════════════════
+// RATE LIMITING — jedna odpowiedź na rundę per przeglądarka
+// ═══════════════════════════════════════════
+const FEEDBACK_STORAGE_KEY = 'ef_submitted_rounds';
+const FEEDBACK_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24h
+
+function hasAlreadySubmitted(roundId) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) || '{}');
+    const entry = stored[roundId];
+    if (!entry) return false;
+    if (Date.now() - entry.ts > FEEDBACK_COOLDOWN_MS) return false;
+    return true;
+  } catch { return false; }
+}
+
+function markAsSubmitted(roundId) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE_KEY) || '{}');
+    stored[roundId] = { ts: Date.now() };
+    Object.keys(stored).forEach(id => {
+      if (Date.now() - stored[id].ts > 7 * 24 * 60 * 60 * 1000) delete stored[id];
+    });
+    localStorage.setItem(FEEDBACK_STORAGE_KEY, JSON.stringify(stored));
+  } catch {}
+}
+
 async function loadFeedbackForm(roundId) {
   const card = document.getElementById('feedback-form-card');
 
-  const { data: round, error } = await sb
+  const { data: round, error } = await sbAnon
     .from('rounds')
     .select('*')
     .eq('id', roundId)
@@ -1730,17 +1787,28 @@ async function loadFeedbackForm(roundId) {
     return;
   }
 
+  if (hasAlreadySubmitted(round.id)) {
+    card.innerHTML = `
+      <div style="text-align:center;padding:40px">
+        <div style="font-size:48px;margin-bottom:16px">✅</div>
+        <h2 style="font-family:'Syne',sans-serif;margin-bottom:8px">Już wypełniłeś ten formularz</h2>
+        <p style="color:var(--text2)">Twój feedback dla tej rundy został już zapisany. Dziękujemy!</p>
+      </div>`;
+    return;
+  }
+
   renderFeedbackFormStep(round, 0);
 }
 
 async function saveResponse(roundId, response) {
-  const { error } = await sb.from('responses').insert({
+  const { error } = await sbAnon.from('responses').insert({
     round_id: roundId,
     anonymous: response.anonymous,
     respondent_name: response.respondent_name,
     answers: response.answers
   });
-  if (error) console.error('Error saving response:', error);
+  if (error) { console.error('Error saving response:', error); return false; }
+  return true;
 }
 
 let fbRound = null;
@@ -1798,20 +1866,30 @@ async function renderFeedbackFormStep(round, step) {
   }
 
   if (step > total) {
-    // Thank you
-    card.innerHTML = `
-      <div style="text-align:center;padding:20px 0">
-        <div style="font-size:56px;margin-bottom:20px">🙌</div>
-        <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
-        <p style="color:var(--text2);font-size:15px">Właśnie dołożyłeś swoją cegiełkę w czyjś rozwój!</p>
-      </div>`;
+    card.innerHTML = '<div class="loading-screen"><div class="spinner"></div></div>';
 
-    // Save to Supabase
-    await saveResponse(round.id, {
+    const ok = await saveResponse(round.id, {
       anonymous: fbAnon,
       respondent_name: fbAnon ? null : fbName,
       answers: fbAnswers
     });
+
+    if (!ok) {
+      card.innerHTML = `
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:56px;margin-bottom:20px">😕</div>
+          <h1 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:12px">Coś poszło nie tak</h1>
+          <p style="color:var(--text2);font-size:15px">Nie udało się zapisać feedbacku. Spróbuj odświeżyć stronę.</p>
+        </div>`;
+    } else {
+      markAsSubmitted(round.id);
+      card.innerHTML = `
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:56px;margin-bottom:20px">🙌</div>
+          <h1 style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:12px">Dziękujemy!</h1>
+          <p style="color:var(--text2);font-size:15px">Właśnie dołożyłeś swoją cegiełkę w czyjś rozwój!</p>
+        </div>`;
+    }
     return;
   }
 
