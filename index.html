@@ -1129,10 +1129,14 @@ async function handleRegister(e) {
 }
 
 async function handleGoogleLogin() {
-  await sb.auth.signInWithOAuth({
+  const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href }
+    options: { redirectTo: window.location.origin + '/' }
   });
+  if (error) {
+    showToast('Nie udało się zalogować przez Google: ' + error.message, 'error');
+    console.error('Google OAuth error:', error);
+  }
 }
 
 async function handleLogout() {
