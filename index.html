@@ -2371,13 +2371,13 @@ async function renderFeedbackFormStep(round, step) {
   } else if (q.type === 'closed') {
     answerHtml = `
       <div class="radio-group">
-        <div class="radio-item${fbAnswers[qi]==='tak'?' selected':''}" onclick="setClosedAnswer(${qi},'tak')">
+        <div class="radio-item${fbAnswers[qi]==='tak'?' selected':''}" data-value="tak" onclick="setClosedAnswer(${qi},'tak')">
           <div class="radio-dot"></div><span>Tak</span>
         </div>
-        <div class="radio-item${fbAnswers[qi]==='nie'?' selected':''}" onclick="setClosedAnswer(${qi},'nie')">
+        <div class="radio-item${fbAnswers[qi]==='nie'?' selected':''}" data-value="nie" onclick="setClosedAnswer(${qi},'nie')">
           <div class="radio-dot"></div><span>Nie</span>
         </div>
-        <div class="radio-item${fbAnswers[qi]==='brak_zdania'?' selected':''}" onclick="setClosedAnswer(${qi},'brak_zdania')">
+        <div class="radio-item${fbAnswers[qi]==='brak_zdania'?' selected':''}" data-value="brak_zdania" onclick="setClosedAnswer(${qi},'brak_zdania')">
           <div class="radio-dot"></div><span>Nie mam zdania</span>
         </div>
       </div>`;
@@ -2434,11 +2434,9 @@ function setScaleAnswer(qi, val) {
 function setClosedAnswer(qi, val) {
   fbAnswers[qi] = val;
   document.querySelectorAll('.radio-item').forEach(item => {
-    item.classList.toggle('selected', item.querySelector('span').textContent.toLowerCase() === val);
-    const dot = item.querySelector('.radio-dot');
-    if (dot) {
-      dot.innerHTML = item.classList.contains('selected') ? '<span style="width:8px;height:8px;background:var(--accent);border-radius:50%;display:block"></span>' : '';
-    }
+    const itemVal = item.getAttribute('data-value');
+    if (!itemVal) return; // pomiń jeśli to nie nasz radio-item
+    item.classList.toggle('selected', itemVal === val);
   });
 }
 
