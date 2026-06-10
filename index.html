@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg: #0a0a0f;
@@ -836,7 +837,7 @@
         <select class="form-select" id="cq-type">
           <option value="scale">Skala 1–5</option>
           <option value="open">Otwarte (tekst)</option>
-          <option value="closed">Zamknięte (tak/nie)</option>
+          <option value="closed">Zamknięte (tak / nie / nie mam zdania)</option>
         </select>
       </div>
       <button class="btn btn-primary" onclick="addCustomQuestion()">Dodaj pytanie</button>
@@ -872,7 +873,7 @@
         <select class="form-select" id="aq-type">
           <option value="scale">Skala 1–5</option>
           <option value="open">Otwarte (tekst)</option>
-          <option value="closed">Zamknięte (tak/nie)</option>
+          <option value="closed">Zamknięte (tak / nie / nie mam zdania)</option>
         </select>
       </div>
       <button class="btn btn-primary" onclick="saveQuestionToBank()">Zapisz pytanie</button>
@@ -984,13 +985,27 @@ const TEMPLATES = {
   }
 };
 
+// ═══════════════════════════════════════════
+// DODATKOWE PYTANIA Z BAZY (poza szablonami)
+// ═══════════════════════════════════════════
+const EXTRA_BANK_QUESTIONS = [
+  { category: 'JA W SWOJEJ ROLI', text: 'Czy widzisz konkretny wpływ mojej pracy na to, jak funkcjonuje Publink na co dzień?', type: 'closed' },
+  { category: 'JA W SWOJEJ ROLI', text: 'Czy widać, że angażuję się w to, co robię — wykraczam poza zakres zadań i biorę ownership za sprawy organizacji?', type: 'closed' },
+  { category: 'SENIORITY', text: 'Czy moje działania są sprawne i szybkie — sprawy które do mnie trafiają nie utykają, tylko idą do przodu?', type: 'closed' },
+  { category: 'KOMUNIKACJA I FEEDBACK', text: 'Czy łatwo się ze mną skontaktować i dogadać — jestem dostępna, otwarta, reaguję w sensownym czasie?', type: 'closed' },
+  { category: 'JA W SWOJEJ ROLI', text: 'Na co powinnam zwrócić większą uwagę / na czym się skupić, żebyś lepiej ocenił / oceniła moją wnoszoną wartość dla Publink?', type: 'open' },
+];
+
 const DEFAULT_QUESTIONS = [];
 
 // ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
 let currentUser = null;
-let allQuestions = Object.values(TEMPLATES).filter(t => t.id !== 'custom').flatMap((t,ti) => t.questions.map((q,i) => ({...q, id: t.id+'_'+i})));
+let allQuestions = [
+  ...Object.values(TEMPLATES).filter(t => t.id !== 'custom').flatMap((t,ti) => t.questions.map((q,i) => ({...q, id: t.id+'_'+i}))),
+  ...EXTRA_BANK_QUESTIONS.map((q,i) => ({...q, id: 'extra_'+i}))
+];
 let selectedQuestions = [];
 let currentRoundId = null;
 let feedbackAnswers = {};
@@ -1313,9 +1328,21 @@ async function showRoundDetail(roundId) {
 
   // Actions
   const actions = document.getElementById('detail-actions');
-  actions.innerHTML = isOpen
-    ? `<button class="btn btn-danger" onclick="closeRound('${roundId}')">Zamknij rundę</button>`
-    : `<span class="badge badge-green" style="padding:8px 14px;font-size:12px">Zakończona</span>`;
+  const exportBtn = responses.length > 0
+    ? `<div style="position:relative;display:inline-block" id="export-wrapper">
+        <button class="btn btn-secondary" onclick="toggleExportMenu(event)">
+          Pobierz odpowiedzi ▾
+        </button>
+        <div id="export-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:160px;z-index:100;overflow:hidden">
+          <div onclick="exportRoundXLS('${roundId}');closeExportMenu()" style="padding:10px 14px;cursor:pointer;font-size:13px;color:var(--text);" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">📊 Excel (.xlsx)</div>
+          <div onclick="exportRoundPDF('${roundId}');closeExportMenu()" style="padding:10px 14px;cursor:pointer;font-size:13px;color:var(--text);border-top:1px solid var(--border)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">📄 PDF (do druku)</div>
+        </div>
+      </div>`
+    : '';
+
+  actions.innerHTML = exportBtn + (isOpen
+    ? `<button class="btn btn-danger" onclick="closeRound('${roundId}')" style="margin-left:8px">Zamknij rundę</button>`
+    : `<span class="badge badge-green" style="padding:8px 14px;font-size:12px;margin-left:8px">Zakończona</span>`);
 
   const content = document.getElementById('detail-content');
 
@@ -1394,10 +1421,12 @@ async function showRoundDetail(roundId) {
       } else if (q.type === 'closed') {
         const yes = qResponses.filter(a=>a==='tak').length;
         const no = qResponses.filter(a=>a==='nie').length;
+        const noOpinion = qResponses.filter(a=>a==='brak_zdania').length;
         html += `</div>`;
-        html += `<div style="display:flex;gap:16px;margin-top:8px">
+        html += `<div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:var(--green);display:inline-block"></span><span class="text-sm">Tak: <strong>${yes}</strong></span></div>
           <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:var(--red);display:inline-block"></span><span class="text-sm">Nie: <strong>${no}</strong></span></div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:var(--text3);display:inline-block"></span><span class="text-sm">Nie mam zdania: <strong>${noOpinion}</strong></span></div>
         </div>`;
 
       } else {
@@ -1462,6 +1491,210 @@ function generateAISummary(round, responses) {
 function copyLink(url) {
   navigator.clipboard.writeText(url);
   showToast('Link skopiowany! 📋', 'success');
+}
+
+// ═══════════════════════════════════════════
+// EXPORT — XLS i PDF
+// ═══════════════════════════════════════════
+function toggleExportMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('export-menu');
+  if (!menu) return;
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function closeExportMenu() {
+  const menu = document.getElementById('export-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+// Zamknij menu przy kliknięciu poza nim
+document.addEventListener('click', (e) => {
+  const wrapper = document.getElementById('export-wrapper');
+  if (wrapper && !wrapper.contains(e.target)) closeExportMenu();
+});
+
+function answerLabel(val) {
+  if (val === 'tak') return 'Tak';
+  if (val === 'nie') return 'Nie';
+  if (val === 'brak_zdania') return 'Nie mam zdania';
+  return val === null || val === undefined || val === '' ? '—' : val;
+}
+
+async function exportRoundXLS(roundId) {
+  try {
+    const { data: round } = await sb.from('rounds').select('*').eq('id', roundId).single();
+    const { data: respData } = await sb.from('responses').select('*').eq('round_id', roundId);
+    if (!round) { showToast('Nie znaleziono rundy', 'error'); return; }
+    const responses = respData || [];
+
+    const wb = XLSX.utils.book_new();
+
+    // Arkusz 1: Podsumowanie
+    const summaryData = [
+      ['EasyFeedback — Raport z rundy'],
+      [],
+      ['Nazwa rundy', round.name],
+      ['Data utworzenia', new Date(round.created_at).toLocaleDateString('pl-PL')],
+      ['Deadline', round.deadline ? new Date(round.deadline).toLocaleDateString('pl-PL') : '—'],
+      ['Liczba odpowiedzi', responses.length],
+      ['Liczba pytań', round.questions.length],
+      ['Status', round.status === 'open' ? 'Aktywna' : 'Zamknięta'],
+      [],
+      ['Statystyki pytań'],
+      ['Pytanie', 'Typ', 'Średnia / Statystyka'],
+    ];
+
+    round.questions.forEach((q, qi) => {
+      const answers = responses.map(r => r.answers[qi]).filter(a => a !== undefined && a !== null && a !== '');
+      let stat = '—';
+      if (q.type === 'scale') {
+        const nums = answers.map(Number).filter(n => !isNaN(n));
+        if (nums.length > 0) stat = (nums.reduce((s,n)=>s+n,0) / nums.length).toFixed(2) + ' / 5';
+      } else if (q.type === 'closed') {
+        const tak = answers.filter(a => a === 'tak').length;
+        const nie = answers.filter(a => a === 'nie').length;
+        const bz = answers.filter(a => a === 'brak_zdania').length;
+        stat = `Tak: ${tak}, Nie: ${nie}, Nie mam zdania: ${bz}`;
+      } else {
+        stat = `${answers.length} odpowiedzi tekstowych`;
+      }
+      summaryData.push([q.text, q.type === 'scale' ? '1-5' : q.type === 'closed' ? 'Zamknięte' : 'Tekst', stat]);
+    });
+
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+    ws1['!cols'] = [{ wch: 60 }, { wch: 12 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Podsumowanie');
+
+    // Arkusz 2: Wszystkie odpowiedzi
+    const allHeader = ['#', 'Respondent', 'Data', ...round.questions.map((q,i) => `P${i+1}: ${q.text.substring(0, 60)}${q.text.length > 60 ? '...' : ''}`)];
+    const allRows = [allHeader];
+    responses.forEach((r, i) => {
+      const who = r.anonymous ? 'Anonimowo' : (r.respondent_name || '—');
+      const date = new Date(r.submitted_at).toLocaleString('pl-PL');
+      const row = [i+1, who, date];
+      round.questions.forEach((q, qi) => row.push(answerLabel(r.answers[qi])));
+      allRows.push(row);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(allRows);
+    ws2['!cols'] = [{ wch: 4 }, { wch: 20 }, { wch: 18 }, ...round.questions.map(() => ({ wch: 30 }))];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Odpowiedzi');
+
+    // Arkusz 3: Otwarte odpowiedzi (tylko teksty)
+    const openQs = round.questions.map((q,i) => ({...q, idx: i})).filter(q => q.type === 'open');
+    if (openQs.length > 0) {
+      const openRows = [['Pytanie', 'Odpowiedź', 'Respondent']];
+      openQs.forEach(q => {
+        responses.forEach(r => {
+          const ans = r.answers[q.idx];
+          if (ans && ans !== '') {
+            const who = r.anonymous ? 'Anonimowo' : (r.respondent_name || '—');
+            openRows.push([q.text, ans, who]);
+          }
+        });
+      });
+      const ws3 = XLSX.utils.aoa_to_sheet(openRows);
+      ws3['!cols'] = [{ wch: 50 }, { wch: 60 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, ws3, 'Otwarte');
+    }
+
+    const safeName = round.name.replace(/[^\w\sąćęłńóśźż-]/gi, '').substring(0, 40);
+    XLSX.writeFile(wb, `EasyFeedback_${safeName}.xlsx`);
+    showToast('Plik Excel pobrany ✓', 'success');
+  } catch (err) {
+    console.error('Export XLS error:', err);
+    showToast('Błąd eksportu do Excel', 'error');
+  }
+}
+
+async function exportRoundPDF(roundId) {
+  try {
+    const { data: round } = await sb.from('rounds').select('*').eq('id', roundId).single();
+    const { data: respData } = await sb.from('responses').select('*').eq('round_id', roundId);
+    if (!round) { showToast('Nie znaleziono rundy', 'error'); return; }
+    const responses = respData || [];
+
+    let html = `<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8">
+      <title>EasyFeedback — ${round.name}</title>
+      <style>
+        @page { margin: 20mm; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; color: #2D3748; line-height: 1.5; }
+        h1 { font-size: 22px; color: #7C5CFC; margin: 0 0 4px 0; }
+        h2 { font-size: 16px; color: #2D3748; margin: 24px 0 12px 0; padding-bottom: 6px; border-bottom: 2px solid #7C5CFC; }
+        h3 { font-size: 13px; margin: 16px 0 6px 0; color: #2D3748; }
+        .meta { color: #718096; font-size: 12px; margin-bottom: 20px; }
+        .question { margin-bottom: 20px; page-break-inside: avoid; }
+        .qhead { display: flex; justify-content: space-between; gap: 12px; align-items: start; margin-bottom: 8px; }
+        .qtext { font-size: 13px; font-weight: 600; flex: 1; }
+        .qtype { font-size: 10px; color: #7C5CFC; background: #EEE9FF; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+        .stat { font-size: 12px; color: #718096; margin-bottom: 6px; }
+        .answer { font-size: 12px; padding: 8px 12px; background: #F7FAFC; border-left: 3px solid #7C5CFC; margin-bottom: 6px; border-radius: 0 4px 4px 0; }
+        .answer-meta { font-size: 10px; color: #A0AEC0; margin-top: 4px; }
+        .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 16px 0; }
+        .summary-card { background: #F7FAFC; padding: 12px; border-radius: 6px; text-align: center; }
+        .summary-value { font-size: 22px; font-weight: 700; color: #7C5CFC; }
+        .summary-label { font-size: 11px; color: #718096; }
+        .closed-stats { display: flex; gap: 16px; font-size: 12px; }
+        .closed-stats span { display: inline-flex; align-items: center; gap: 6px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .footer { margin-top: 30px; padding-top: 16px; border-top: 1px solid #E2E8F0; font-size: 10px; color: #A0AEC0; text-align: center; }
+      </style></head><body>
+      <h1>${round.name}</h1>
+      <div class="meta">Raport EasyFeedback — wygenerowany ${new Date().toLocaleDateString('pl-PL')}</div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-value">${responses.length}</div><div class="summary-label">Odpowiedzi</div></div>
+        <div class="summary-card"><div class="summary-value">${round.questions.length}</div><div class="summary-label">Pytań</div></div>
+        <div class="summary-card"><div class="summary-value">${round.status === 'open' ? 'Aktywna' : 'Zamknięta'}</div><div class="summary-label">Status</div></div>
+      </div>
+      <h2>Wyniki według pytań</h2>`;
+
+    round.questions.forEach((q, qi) => {
+      const answers = responses.map(r => r.answers[qi]).filter(a => a !== undefined && a !== null && a !== '');
+      const typeLbl = q.type === 'scale' ? '1-5' : q.type === 'closed' ? 'Zamknięte' : 'Tekst';
+      html += `<div class="question"><div class="qhead"><div class="qtext">${q.text}</div><div class="qtype">${typeLbl}</div></div>`;
+
+      if (q.type === 'scale') {
+        const nums = answers.map(Number).filter(n => !isNaN(n));
+        const avg = nums.length > 0 ? (nums.reduce((s,n)=>s+n,0) / nums.length).toFixed(2) : '—';
+        const dist = [1,2,3,4,5].map(n => nums.filter(v => v === n).length);
+        html += `<div class="stat">Średnia: <strong>${avg} / 5</strong> · Liczba odpowiedzi: ${nums.length}</div>`;
+        html += `<div class="stat">Rozkład: ${dist.map((c,i) => `${i+1}: ${c}x`).join(' · ')}</div>`;
+      } else if (q.type === 'closed') {
+        const tak = answers.filter(a => a === 'tak').length;
+        const nie = answers.filter(a => a === 'nie').length;
+        const bz = answers.filter(a => a === 'brak_zdania').length;
+        html += `<div class="closed-stats">
+          <span><span class="dot" style="background:#48BB78"></span> Tak: <strong>${tak}</strong></span>
+          <span><span class="dot" style="background:#F56565"></span> Nie: <strong>${nie}</strong></span>
+          <span><span class="dot" style="background:#A0AEC0"></span> Nie mam zdania: <strong>${bz}</strong></span>
+        </div>`;
+      } else {
+        if (answers.length === 0) {
+          html += `<div class="stat">Brak odpowiedzi</div>`;
+        } else {
+          responses.forEach(r => {
+            const ans = r.answers[qi];
+            if (ans && ans !== '') {
+              const who = r.anonymous ? 'Anonimowo' : (r.respondent_name || '—');
+              html += `<div class="answer">${ans.toString().replace(/</g, '&lt;').replace(/\n/g, '<br>')}<div class="answer-meta">— ${who}</div></div>`;
+            }
+          });
+        }
+      }
+      html += `</div>`;
+    });
+
+    html += `<div class="footer">Wygenerowane z aplikacji EasyFeedback · easyfeedback.pl</div></body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) { showToast('Pozwól na otwieranie wyskakujących okien', 'error'); return; }
+    w.document.write(html);
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 500);
+  } catch (err) {
+    console.error('Export PDF error:', err);
+    showToast('Błąd eksportu do PDF', 'error');
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1542,7 +1775,7 @@ function toggleBankQuestion(qId) {
 }
 
 function typeLabel(type) {
-  return type === 'scale' ? '1–5' : type === 'open' ? 'Tekst' : 'Tak/Nie';
+  return type === 'scale' ? '1–5' : type === 'open' ? 'Tekst' : 'Zamknięte';
 }
 
 function toggleQuestion(qId) {
@@ -1672,6 +1905,18 @@ async function loadQuestionsAdmin() {
     });
     html += `</div>`;
   });
+
+  // Sekcja: dodatkowe pytania (poza szablonami)
+  if (EXTRA_BANK_QUESTIONS.length > 0) {
+    html += `<div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:16px;font-size:15px">⭐ Dodatkowe pytania</h3>`;
+    EXTRA_BANK_QUESTIONS.forEach(q => {
+      html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1"><div style="font-size:14px;margin-bottom:3px">${q.text}</div>
+        <span style="font-size:11px;color:var(--text3)">${q.category}</span></div>
+        <div class="badge badge-purple">${typeLabel(q.type)}</div></div>`;
+    });
+    html += `</div>`;
+  }
 
   html += `<div class="card" style="margin-bottom:16px"><h3 style="margin-bottom:16px;font-size:15px">✏️ Moje pytania</h3>`;
   if (!userQs || userQs.length === 0) {
@@ -1919,6 +2164,9 @@ async function renderFeedbackFormStep(round, step) {
         </div>
         <div class="radio-item${fbAnswers[qi]==='nie'?' selected':''}" onclick="setClosedAnswer(${qi},'nie')">
           <div class="radio-dot"></div><span>Nie</span>
+        </div>
+        <div class="radio-item${fbAnswers[qi]==='brak_zdania'?' selected':''}" onclick="setClosedAnswer(${qi},'brak_zdania')">
+          <div class="radio-dot"></div><span>Nie mam zdania</span>
         </div>
       </div>`;
   }
