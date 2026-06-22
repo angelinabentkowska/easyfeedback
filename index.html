@@ -451,6 +451,22 @@
     }
     .radio-item.selected .radio-dot { border-color: var(--accent); }
     .radio-item.selected .radio-dot::after { content: ''; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+    .fq-description { font-size: 13px; color: var(--text2); margin: -8px 0 12px 0; line-height: 1.5; font-style: italic; }
+    .checkbox-group { display: flex; flex-direction: column; gap: 8px; }
+    .checkbox-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border: 1px solid var(--border2);
+      border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s;
+    }
+    .checkbox-item:hover { border-color: var(--accent); background: rgba(124,92,252,0.05); }
+    .checkbox-item.selected { border-color: var(--accent); background: rgba(124,92,252,0.1); }
+    .checkbox-box {
+      width: 18px; height: 18px; border: 2px solid var(--border2);
+      border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .checkbox-item.selected .checkbox-box { background: var(--accent); border-color: var(--accent); }
+    .checkbox-item.selected .checkbox-box::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 700; }
     .anon-toggle { display: flex; align-items: center; gap: 12px; padding: 16px; background: var(--bg3); border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 28px; }
     .anon-text h4 { font-size: 14px; font-weight: 500; }
     .anon-text p { font-size: 13px; color: var(--text2); }
@@ -936,6 +952,12 @@
                   <div class="template-desc">Strategic impact i seniority</div>
                   <div class="template-count" id="tpl-count-12msc">15 pytań</div>
                 </div>
+                <div class="template-card" onclick="selectTemplate('wiatraki')" id="tpl-wiatraki">
+                  <div class="template-emoji">🏕️</div>
+                  <div class="template-name">Wiatraki Resort</div>
+                  <div class="template-desc">Ankieta po wyjeździe integracyjnym</div>
+                  <div class="template-count" id="tpl-count-wiatraki">19 pytań</div>
+                </div>
                 <div class="template-card" onclick="selectTemplate('custom')" id="tpl-custom">
                   <div class="template-emoji">✏️</div>
                   <div class="template-name">Własny szablon</div>
@@ -1186,6 +1208,32 @@ const TEMPLATES = {
       { category: 'KOMUNIKACJA I FEEDBACK', text: 'Czy aktywnie buduję kulturę feedbacku w swoim otoczeniu, nie tylko przyjmuję, ale też inicjuję?', type: 'scale' },
       { category: 'JA W SWOJEJ ROLI', text: 'Czy jestem osobą, o którą organizacja powinna walczyć, gdyby chciała odejść?', type: 'closed' },
       { category: 'JA W SWOJEJ ROLI', text: 'Co chcesz mi przekazać, czego nie zawierało żadne z powyższych pytań?', type: 'open' },
+    ]
+  },
+  'wiatraki': {
+    id: 'wiatraki',
+    emoji: '🏕️',
+    name: 'Wiatraki Resort',
+    desc: 'Ankieta feedbackowa po wyjeździe integracyjnym',
+    questions: [
+      { category: 'WYJAZD', text: 'Jak oceniasz wyjazd integracyjny personalnie, jako Twoje doświadczenie?', type: 'scale', description: '1 = słabo, 5 = super' },
+      { category: 'WYJAZD', text: 'Jak oceniasz wartość tego wyjazdu dla Publink jako organizacji?', type: 'scale', description: '1 = niska, 5 = bardzo wysoka' },
+      { category: 'OŚRODEK', text: 'Jak oceniasz vibe ośrodka Wiatraki Nature Resort?', type: 'scale', description: 'Twoja odpowiedź pomoże mi lepiej dobierać standard i klimat miejsca na przyszłe wyjazdy, dlatego zależy mi na szczerości. 1 = nie pasuje mi, 5 = trafiony w punkt' },
+      { category: 'OŚRODEK', text: 'Co najbardziej podobało Ci się w ośrodku?', type: 'open' },
+      { category: 'OŚRODEK', text: 'Czego brakowało Ci w ośrodku lub co byś zmienił/a?', type: 'open' },
+      { category: 'LOGISTYKA', text: 'Jak oceniasz organizację dojazdu?', type: 'scale', description: 'To, że dojeżdżaliśmy busami / własnym środkiem transportu. Oceń czy było to dla Ciebie komfortowe. 1 = niekomfortowe, 5 = super' },
+      { category: 'AKTYWNOŚCI', text: 'Jak oceniasz liczbę zaplanowanych aktywności?', type: 'single_choice', options: ['Za mało', 'W sam raz', 'Za dużo'] },
+      { category: 'AKTYWNOŚCI', text: 'Mam przemyślenie, że aktywności w dzień wyjazdu z integracji są zbędne i lepiej zostawić ten czas na swobodne dotarcie i odpoczynek. Zgadzasz się?', type: 'closed' },
+      { category: 'AKTYWNOŚCI', text: 'Które aktywności z tego wyjazdu podobały Ci się najbardziej?', type: 'multi_choice', options: ['Paintball', 'Spływ kajakowy', 'Warsztaty lepienia z gliny', 'Mobility', 'Czas wolny nad jeziorem', 'Wieczory przy ognisku'] },
+      { category: 'AKTYWNOŚCI', text: 'Jakie typy aktywności najchętniej widziałbyś/widziałabyś na przyszłych wyjazdach?', type: 'multi_choice', options: ['Sportowe zespołowe (np. spływ kajakowy, gry drużynowe, siatkówka)', 'Sportowe indywidualne (np. jazda rowerem, bieganie, SUP)', 'Kreatywne (np. warsztaty ceramiczne, gotowanie, rzemiosło)', 'Ruchowe, ale spokojne (np. joga, stretching, mobility, nordic walking)', 'Z adrenaliną (np. quady, offroad, paintball, wspinaczka, zjazd na linie)', 'Eksploracyjne (np. wycieczka lokalna, zwiedzanie, szlak pieszy)', 'Integracyjne grupowe (np. gry terenowe, escape room, zadania zespołowe)', 'Relaksacyjne (np. sauna, balia, masaż, czas wolny bez planu)'] },
+      { category: 'INTEGRACJA', text: 'Czy podczas wyjazdu miałeś/miałaś okazję porozmawiać z osobami, z którymi na co dzień nie masz kontaktu?', type: 'single_choice', options: ['Tak', 'Częściowo', 'Nie'] },
+      { category: 'INTEGRACJA', text: 'Czy było wystarczająco dużo czasu wolnego, żeby te rozmowy mogły się wydarzyć naturalnie?', type: 'closed' },
+      { category: 'FORMAT', text: 'Jak oceniasz długość wyjazdu (3 dni, 2 noce)?', type: 'single_choice', options: ['Za krótko', 'W sam raz', 'Za długo'] },
+      { category: 'PODSUMOWANIE', text: 'Jedno, co na pewno powtórzyłbyś/powtórzyłabyś na następnym wyjeździe?', type: 'open' },
+      { category: 'PODSUMOWANIE', text: 'Jedno, co na pewno zmienił/abyś?', type: 'open' },
+      { category: 'FORMAT', text: 'Preferujesz wyjazdy integracyjne w formacie:', type: 'multi_choice', options: ['Jednodniowe bez noclegu', 'Dwudniowe z jedną nocą', 'Trzydniowe z dwoma noclegami'] },
+      { category: 'FORMAT', text: 'Czy jesteś otwarty/a na wyjazd zagraniczny?', type: 'single_choice', options: ['Tak', 'Nie'] },
+      { category: 'PODSUMOWANIE', text: 'Czy jest coś, czego nie zapytałam, a chciałbyś/chciałabyś powiedzieć?', type: 'open' },
     ]
   },
   'custom': {
@@ -1641,6 +1689,42 @@ async function showRoundDetail(roundId) {
           <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:var(--text3);display:inline-block"></span><span class="text-sm">Nie mam zdania: <strong>${noOpinion}</strong></span></div>
         </div>`;
 
+      } else if (q.type === 'single_choice') {
+        html += `</div>`;
+        const opts = q.options || [];
+        const total = qResponses.length;
+        html += `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">`;
+        opts.forEach(opt => {
+          const count = qResponses.filter(a => a === opt).length;
+          const pct = total > 0 ? Math.round(count / total * 100) : 0;
+          html += `<div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+              <span>${opt}</span><span style="color:var(--text2)">${count}x (${pct}%)</span>
+            </div>
+            <div class="scale-bar"><div class="scale-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        });
+        html += `</div>`;
+
+      } else if (q.type === 'multi_choice') {
+        html += `</div>`;
+        const opts = q.options || [];
+        const total = qResponses.length;
+        // qResponses to tablice (arrays) — zlicz ile razy każda opcja się pojawia
+        const allSelections = qResponses.flat();
+        html += `<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">`;
+        opts.forEach(opt => {
+          const count = allSelections.filter(a => a === opt).length;
+          const pct = total > 0 ? Math.round(count / total * 100) : 0;
+          html += `<div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+              <span>${opt}</span><span style="color:var(--text2)">${count}x (${pct}% respondentów)</span>
+            </div>
+            <div class="scale-bar"><div class="scale-fill" style="width:${pct}%"></div></div>
+          </div>`;
+        });
+        html += `</div>`;
+
       } else {
         html += `</div>`;
         html += `<div class="open-responses">`;
@@ -1730,6 +1814,7 @@ function answerLabel(val) {
   if (val === 'tak') return 'Tak';
   if (val === 'nie') return 'Nie';
   if (val === 'brak_zdania') return 'Nie mam zdania';
+  if (Array.isArray(val)) return val.join(', ');
   return val === null || val === undefined || val === '' ? '—' : val;
 }
 
@@ -1768,6 +1853,13 @@ async function exportRoundXLS(roundId) {
         const nie = answers.filter(a => a === 'nie').length;
         const bz = answers.filter(a => a === 'brak_zdania').length;
         stat = `Tak: ${tak}, Nie: ${nie}, Nie mam zdania: ${bz}`;
+      } else if (q.type === 'single_choice') {
+        const opts = q.options || [];
+        stat = opts.map(opt => `${opt}: ${answers.filter(a => a === opt).length}x`).join(', ');
+      } else if (q.type === 'multi_choice') {
+        const opts = q.options || [];
+        const allSel = answers.flat();
+        stat = opts.map(opt => `${opt}: ${allSel.filter(a => a === opt).length}x`).join('; ');
       } else {
         stat = `${answers.length} odpowiedzi tekstowych`;
       }
@@ -1880,6 +1972,23 @@ async function exportRoundPDF(roundId) {
           <span><span class="dot" style="background:#F56565"></span> Nie: <strong>${nie}</strong></span>
           <span><span class="dot" style="background:#A0AEC0"></span> Nie mam zdania: <strong>${bz}</strong></span>
         </div>`;
+      } else if (q.type === 'single_choice') {
+        const opts = q.options || [];
+        const total = answers.length;
+        opts.forEach(opt => {
+          const count = answers.filter(a => a === opt).length;
+          const pct = total > 0 ? Math.round(count / total * 100) : 0;
+          html += `<div class="stat">${opt}: <strong>${count}x</strong> (${pct}%)</div>`;
+        });
+      } else if (q.type === 'multi_choice') {
+        const opts = q.options || [];
+        const total = answers.length;
+        const allSel = answers.flat();
+        opts.forEach(opt => {
+          const count = allSel.filter(a => a === opt).length;
+          const pct = total > 0 ? Math.round(count / total * 100) : 0;
+          html += `<div class="stat">${opt}: <strong>${count}x</strong> (${pct}% respondentów)</div>`;
+        });
       } else {
         if (answers.length === 0) {
           html += `<div class="stat">Brak odpowiedzi</div>`;
@@ -1987,7 +2096,12 @@ function toggleBankQuestion(qId) {
 }
 
 function typeLabel(type) {
-  return type === 'scale' ? '1–5' : type === 'open' ? 'Tekst' : 'Zamknięte';
+  if (type === 'scale') return '1–5';
+  if (type === 'open') return 'Tekst';
+  if (type === 'closed') return 'Zamknięte';
+  if (type === 'single_choice') return 'Jednokrotny wybór';
+  if (type === 'multi_choice') return 'Wielokrotny wybór';
+  return type;
 }
 
 function toggleQuestion(qId) {
@@ -2358,6 +2472,8 @@ async function renderFeedbackFormStep(round, step) {
   const qi = step - 1;
 
   let answerHtml = '';
+  const descHtml = q.description ? `<div class="fq-description">${q.description}</div>` : '';
+
   if (q.type === 'scale') {
     answerHtml = `
       <div class="scale-picker" id="scale-picker">
@@ -2381,6 +2497,24 @@ async function renderFeedbackFormStep(round, step) {
           <div class="radio-dot"></div><span>Nie mam zdania</span>
         </div>
       </div>`;
+  } else if (q.type === 'single_choice') {
+    const currentVal = fbAnswers[qi] || null;
+    answerHtml = `
+      <div class="radio-group">
+        ${(q.options || []).map(opt => `
+          <div class="radio-item${currentVal===opt?' selected':''}" data-value="${opt.replace(/"/g,'&quot;')}" onclick="setSingleChoice(${qi}, this)">
+            <div class="radio-dot"></div><span>${opt}</span>
+          </div>`).join('')}
+      </div>`;
+  } else if (q.type === 'multi_choice') {
+    const currentVals = fbAnswers[qi] || [];
+    answerHtml = `
+      <div class="checkbox-group">
+        ${(q.options || []).map(opt => `
+          <div class="checkbox-item${currentVals.includes(opt)?' selected':''}" data-value="${opt.replace(/"/g,'&quot;')}" onclick="toggleMultiChoice(${qi}, this)">
+            <div class="checkbox-box"></div><span>${opt}</span>
+          </div>`).join('')}
+      </div>`;
   }
 
   card.innerHTML = `
@@ -2390,6 +2524,7 @@ async function renderFeedbackFormStep(round, step) {
     </div>
     <div class="fq-item">
       <span class="fq-label">${q.text}</span>
+      ${descHtml}
       ${answerHtml}
     </div>
     <div style="display:flex;justify-content:space-between;margin-top:28px">
@@ -2435,9 +2570,34 @@ function setClosedAnswer(qi, val) {
   fbAnswers[qi] = val;
   document.querySelectorAll('.radio-item').forEach(item => {
     const itemVal = item.getAttribute('data-value');
-    if (!itemVal) return; // pomiń jeśli to nie nasz radio-item
+    if (!itemVal) return;
     item.classList.toggle('selected', itemVal === val);
   });
+}
+
+function setSingleChoice(qi, el) {
+  const val = el.getAttribute('data-value');
+  fbAnswers[qi] = val;
+  document.querySelectorAll('.radio-item').forEach(item => {
+    item.classList.toggle('selected', item === el);
+    const dot = item.querySelector('.radio-dot');
+    if (dot) {
+      dot.style.borderColor = item === el ? 'var(--accent)' : '';
+    }
+  });
+}
+
+function toggleMultiChoice(qi, el) {
+  const val = el.getAttribute('data-value');
+  if (!fbAnswers[qi]) fbAnswers[qi] = [];
+  const idx = fbAnswers[qi].indexOf(val);
+  if (idx === -1) {
+    fbAnswers[qi].push(val);
+    el.classList.add('selected');
+  } else {
+    fbAnswers[qi].splice(idx, 1);
+    el.classList.remove('selected');
+  }
 }
 
 function nextFeedbackStep(step, qi) {
@@ -2445,6 +2605,8 @@ function nextFeedbackStep(step, qi) {
   // Collect open answer if any
   const openEl = document.getElementById('open-answer');
   if (openEl) fbAnswers[qi] = openEl.value;
+  // multi_choice: upewnij się że jest array a nie undefined
+  if (q.type === 'multi_choice' && !fbAnswers[qi]) fbAnswers[qi] = [];
 
   renderFeedbackFormStep(fbRound, step + 1);
 }
